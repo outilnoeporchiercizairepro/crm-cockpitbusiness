@@ -543,8 +543,10 @@ Ce qui a changé sur ce front :
 - **Fiche contact allégée** : rôle, secteur, effectif, CA et LinkedIn ont été
   supprimés du schéma et des formulaires — vérifiés vides sur la totalité des
   contacts avant suppression. Le panneau n'affiche plus de colonnes de tirets.
-- **Suppression d'un contact depuis la liste** (admin uniquement) : une icône
-  corbeille apparaît au survol de la ligne. La confirmation annonce précisément
+- **Suppression d'un contact** (admin uniquement) : icône corbeille au survol
+  d'une ligne de la liste, et bloc « Zone sensible » en bas de la fiche
+  opportunité. Depuis la fiche, la suppression renvoie vers la liste — un
+  simple rafraîchissement afficherait un 404, la page venant de disparaître. La confirmation annonce précisément
   ce qui sera détruit en cascade — opportunités, activités, RDV, relances — et
   alerte séparément si du chiffre d'affaires signé va disparaître du dashboard.
 - **Moins de bruit** : « Noé → Noé » a disparu des cartes et de l'en-tête de fiche ;

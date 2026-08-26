@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { exigerIdentite } from '@/lib/session'
+import { exigerIdentite, profilCourant } from '@/lib/session'
 import { Carte, Badge } from '@/components/ui'
 import { PanneauContact } from '@/components/panneau-contact'
 import { Timeline, type Evenement } from '@/components/timeline'
 import { BlocAction } from '@/components/bloc-action'
 import { RelanceWhatsApp } from '@/components/relance-whatsapp'
 import { Echeancier } from '@/components/echeancier'
+import { SuppressionContact } from '@/components/suppression-contact'
 import { euros, nomContact, LIBELLE_ICP } from '@/lib/format'
 import type { PipelineStage } from '@/lib/database.types'
 
@@ -44,7 +45,10 @@ export default async function FicheOpportunite({
   }
   const etape = opp.pipeline_stages as unknown as PipelineStage
 
-  const [activites, rdvs, transitions, etapes, motifs, profils, taches, echeances] = await Promise.all([
+  const [profil, activites, rdvs, transitions, etapes, motifs, profils, taches, echeances] = await Promise.all([
+    // Déjà chargé par le layout et mémorisé pour la requête : aucun
+    // aller-retour supplémentaire.
+    profilCourant(),
     supabase
       .from('activities')
       .select('*')
@@ -187,6 +191,23 @@ export default async function FicheOpportunite({
             taches={taches.data ?? []}
             moi={moi.id}
           />
+
+          {profil.role === 'admin' && (
+            <Carte className="p-4">
+              <h2 className="mb-1 text-xs font-medium uppercase tracking-wide text-texte-faible">
+                Zone sensible
+              </h2>
+              <p className="mb-3 text-xs text-texte-faible">
+                Efface le contact et tout son historique. Irréversible.
+              </p>
+              <SuppressionContact
+                contactId={contact.id}
+                nom={nomContact(contact)}
+                variante="bouton"
+                apresSuppression="liste"
+              />
+            </Carte>
+          )}
         </div>
       </div>
     </div>

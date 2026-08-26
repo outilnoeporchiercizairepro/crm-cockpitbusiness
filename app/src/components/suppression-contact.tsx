@@ -11,9 +11,18 @@ import { euros } from '@/lib/format'
 export function SuppressionContact({
   contactId,
   nom,
+  variante = 'discret',
+  apresSuppression = 'rafraichir',
 }: {
   contactId: string
   nom: string
+  /** « discret » : icône au survol d'une ligne. « bouton » : toujours visible. */
+  variante?: 'discret' | 'bouton'
+  /**
+   * Depuis la fiche, la page disparaît avec le contact : rafraîchir
+   * afficherait un 404. On repart alors vers la liste.
+   */
+  apresSuppression?: 'rafraichir' | 'liste'
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -45,8 +54,11 @@ export function SuppressionContact({
   function confirmer() {
     demarrer(async () => {
       const r = await supprimerContact(contactId)
-      if (r.ok) { fermer(); router.refresh() }
-      else setErreur(r.erreur)
+      if (!r.ok) { setErreur(r.erreur); return }
+
+      fermer()
+      if (apresSuppression === 'liste') router.replace('/contacts')
+      else router.refresh()
     })
   }
 
@@ -57,11 +69,16 @@ export function SuppressionContact({
         disabled={enCours}
         title={`Supprimer ${nom}`}
         aria-label={`Supprimer ${nom}`}
-        className="rounded p-1.5 text-texte-faible opacity-0 transition group-hover:opacity-100 hover:bg-danger/12 hover:text-danger focus:opacity-100 disabled:opacity-40"
+        className={
+          variante === 'bouton'
+            ? 'flex w-full items-center justify-center gap-1.5 rounded-lg border border-bordure px-3.5 py-2 text-sm text-texte-doux transition hover:border-danger/50 hover:text-danger disabled:opacity-40'
+            : 'rounded p-1.5 text-texte-faible opacity-0 transition group-hover:opacity-100 hover:bg-danger/12 hover:text-danger focus:opacity-100 disabled:opacity-40'
+        }
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6" />
         </svg>
+        {variante === 'bouton' && 'Supprimer le contact'}
       </button>
 
       {ouvert && (

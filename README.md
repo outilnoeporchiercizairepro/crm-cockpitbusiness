@@ -112,9 +112,27 @@ SUPABASE_SECRET_KEY
 du `docker-compose.yml`, qui ne sert pas ici — un « Bad Gateway » vient
 presque toujours de là : Traefik frappe à une porte où personne n'écoute.
 
-Sonde de santé : `GET /api/sante`. Elle répond même si la configuration
-Supabase manque, pour que l'erreur remonte en 500 explicite plutôt qu'en
-« Bad Gateway ».
+### Diagnostiquer un déploiement
+
+`GET /api/sante` répond toujours 200 — même sans configuration — et dit ce
+qui manque :
+
+```json
+{ "pret": false,
+  "aCorriger": ["NEXT_PUBLIC_SUPABASE_URL"],
+  "configuration": {
+    "NEXT_PUBLIC_SUPABASE_URL": { "presente": true,
+      "probleme": "entourée de guillemets — retire-les" } } }
+```
+
+Elle ne révèle **aucune valeur**, seulement la présence et la forme des
+variables. Elle détecte les guillemets saisis par erreur autour d'une valeur
+et les espaces parasites — deux causes classiques d'« Internal Server Error »
+après un déploiement.
+
+Elle reste volontairement à 200 en configuration incomplète : la passer en
+rouge ferait sortir le conteneur du routage, et l'erreur redeviendrait un
+502 muet.
 
 DNS : un enregistrement `A` du domaine vers l'adresse IP du VPS. Le
 certificat TLS est demandé par Dokploy une fois le domaine résolu.

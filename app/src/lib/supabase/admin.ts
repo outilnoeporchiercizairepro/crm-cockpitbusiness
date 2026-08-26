@@ -1,6 +1,7 @@
 import 'server-only'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/database.types'
+import { envSupabase } from '@/lib/env-supabase'
 
 /**
  * Client à clé de service : contourne la RLS et donne accès à l'API Admin
@@ -21,7 +22,7 @@ export function createAdminClient() {
     )
   }
 
-  return createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, cle, {
+  return createClient<Database>(envSupabase().url, cle, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 }

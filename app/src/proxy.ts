@@ -1,15 +1,17 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { envSupabase } from '@/lib/env-supabase'
 
 // /api/sante doit répondre sans session : c'est la sonde des conteneurs.
 const PUBLIC_PATHS = ['/login', '/desactive', '/api/sante']
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request })
+  const { url: urlSupabase, cleAnon } = envSupabase()
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    urlSupabase,
+    cleAnon,
     {
       cookies: {
         getAll() {

@@ -5,9 +5,9 @@
 # depuis le Dockerfile et place Traefik devant. Le service nginx ferait
 # doublon.
 #
-#   docker compose build --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
-#                        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-#   docker compose up -d
+# Aucune variable n'est nécessaire au build : tout se règle à l'exécution.
+#   cp .env.deploiement.example .env   puis renseigne les valeurs
+#   docker compose up -d --build
 # =====================================================================
 
 services:
@@ -15,18 +15,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        # Inscrites dans le bundle navigateur au moment du build.
-        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     restart: unless-stopped
     environment:
-      # Fournie à l'exécution seulement : en build-arg, elle resterait
-      # lisible dans les couches de l'image.
-      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
-      # Renseignées aussi ici : le serveur Next les lit côté rendu.
+      # Le serveur les lit au démarrage et injecte les deux publiques dans
+      # la page. La clé de service, elle, ne quitte jamais le serveur.
       NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
     expose:
       - "3000"
     healthcheck:

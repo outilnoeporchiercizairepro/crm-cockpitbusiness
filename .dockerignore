@@ -21,6 +21,7 @@ bun.lockb
 **/.env
 **/.env.*
 !**/.env.example
+!.env.deploiement.example
 
 # Données clients : l'import du COCKPIT contient les coordonnées réelles
 # des prospects. Il n'a rien à faire dans une image.

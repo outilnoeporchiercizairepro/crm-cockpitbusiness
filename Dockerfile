@@ -4,10 +4,16 @@
 # Contexte de build : la RACINE du dépôt (l'application vit dans app/).
 #   docker build -t crm-altitude .
 #
-# ⚠️ Les variables NEXT_PUBLIC_* sont inscrites dans le bundle navigateur
-# AU MOMENT DU BUILD, pas au démarrage. Elles doivent donc être passées en
-# --build-arg. La clé de service, elle, ne doit JAMAIS l'être : un build-arg
-# reste lisible dans les couches de l'image. Elle se fournit à l'exécution.
+# Aucune variable n'est nécessaire au build : l'application lit sa
+# configuration Supabase au DÉMARRAGE et l'injecte dans la page. La même
+# image fonctionne donc dans n'importe quel environnement.
+#
+# Tout se règle en variables d'environnement du conteneur :
+#   NEXT_PUBLIC_SUPABASE_URL       (publique)
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY  (publique)
+#   SUPABASE_SECRET_KEY            (secrète — jamais en --build-arg,
+#                                   un argument de build reste lisible
+#                                   dans les couches de l'image)
 # =====================================================================
 
 # ---------- 1. Dépendances -------------------------------------------
@@ -26,19 +32,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY app/ ./
 
-# Publiques par nature : elles partent dans le navigateur de toute façon.
-ARG NEXT_PUBLIC_SUPABASE_URL
-ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
-ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
-ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-# Échoue tôt plutôt que de produire une image qui plantera à la connexion :
-# sans ces valeurs, le bundle client contiendrait "undefined".
-RUN test -n "$NEXT_PUBLIC_SUPABASE_URL" \
- || (echo "NEXT_PUBLIC_SUPABASE_URL manquante (--build-arg)" && exit 1)
-RUN test -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
- || (echo "NEXT_PUBLIC_SUPABASE_ANON_KEY manquante (--build-arg)" && exit 1)
-
+# Build sans secret ni configuration : rien d'environnemental n'est figé
+# dans l'image, et elle est donc rejouable à l'identique.
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

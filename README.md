@@ -97,42 +97,51 @@ droits sur la base à n'importe qui.
 ### Sur Dokploy
 
 Dokploy embarque déjà Traefik comme reverse proxy et gère le certificat TLS.
-**N'utilise ni `nginx.conf` ni `docker-compose.yml`** : ils feraient doublon et
-créeraient un second point d'entrée. Pointe simplement Dokploy sur le dépôt et
-sur le `Dockerfile`, puis renseigne :
-
-*Build arguments* (inscrits dans le bundle navigateur au moment du build) :
+**N'utilise ni `nginx.conf` ni `docker-compose.yml`** : ils feraient doublon.
+Pointe Dokploy sur le dépôt et sur le `Dockerfile`, puis renseigne **trois
+variables d'environnement** — et rien d'autre, pas de *build arguments* :
 
 ```
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_ANON_KEY
+SUPABASE_SECRET_KEY
 ```
-
-*Variables d'environnement* (au démarrage du conteneur) : les deux ci-dessus,
-**plus** `SUPABASE_SECRET_KEY`.
 
 Sonde de santé : `GET /api/sante`.
 
 ### Sur un VPS avec Docker seul
 
 ```bash
-docker compose build --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
+cp .env.deploiement.example .env
 ```
 
-puis `docker compose up -d`. Le TLS reste à ajouter : les blocs `listen 443` et
-la redirection HTTP sont préparés en commentaire dans `nginx.conf`.
+Renseigne les trois variables, puis `docker compose up -d --build`. Le TLS
+reste à ajouter : les blocs `listen 443` et la redirection HTTP sont préparés
+en commentaire dans `nginx.conf`.
 
-### Le piège des variables d'environnement
+### Pourquoi aucune variable au moment du build
 
-Next **inscrit les variables `NEXT_PUBLIC_*` dans le bundle navigateur au
-moment du build**, pas au démarrage. Les fournir uniquement à l'exécution
-produit une image qui compile sans erreur puis échoue à la connexion, le
-client cherchant à joindre `undefined`. Le Dockerfile échoue donc
-volontairement tôt si elles manquent.
+Next inscrit normalement les variables `NEXT_PUBLIC_*` **dans le bundle
+navigateur au moment du build**. Une image construite sans elles part alors
+en production avec `undefined` à l'intérieur, et rien ne le signale avant la
+première tentative de connexion.
 
-À l'inverse, **`SUPABASE_SECRET_KEY` ne doit jamais être un build-arg** : un
-argument de build reste lisible dans les couches de l'image, et cette clé
-contourne toute la RLS. Elle se fournit à l'exécution, uniquement.
+Plutôt que d'exiger des *build arguments* — que toutes les plateformes ne
+transmettent pas, et Dokploy ne le faisait pas —, le serveur lit ces valeurs
+**au démarrage** et les dépose dans la page. Conséquences :
+
+- la même image fonctionne dans n'importe quel environnement, sans être
+  reconstruite ;
+- il n'y a plus qu'un seul endroit à renseigner : les variables
+  d'environnement ;
+- si l'une manque, le serveur refuse de répondre avec un message qui la
+  nomme, au lieu d'échouer silencieusement côté navigateur.
+
+En contrepartie, **toutes les pages sont rendues à la demande**, y compris
+`/login` : une page prérendue figerait la configuration dans son HTML.
+
+`SUPABASE_SECRET_KEY` reste strictement côté serveur — vérifié, elle
+n'apparaît pas dans la page.
 
 ## Lancer l'application
 

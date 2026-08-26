@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-fond: #0b0f14;
+  --color-surface: #121821;
+  --color-surface-2: #18202b;
+  --color-bordure: #24303f;
+  --color-bordure-forte: #33445a;
+
+  --color-texte: #e8eef6;
+  --color-texte-doux: #9aacc2;
+  --color-texte-faible: #667c96;
+
+  --color-altitude: #4a9eff;
+  --color-altitude-sombre: #2b7fe0;
+
+  --color-succes: #34d399;
+  --color-alerte: #fbbf24;
+  --color-danger: #f87171;
+  --color-violet: #a78bfa;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  border-color: var(--color-bordure);
+}
+
+html, body {
+  background: var(--color-fond);
+  color: var(--color-texte);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Le kanban défile horizontalement sans jamais faire défiler la page. */
+.scroll-fin::-webkit-scrollbar { height: 10px; width: 10px; }
+.scroll-fin::-webkit-scrollbar-track { background: transparent; }
+.scroll-fin::-webkit-scrollbar-thumb {
+  background: var(--color-bordure-forte);
+  border-radius: 999px;
+}
+
+@keyframes apparait {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.apparait { animation: apparait 0.18s ease-out both; }
+
+/* Squelettes de chargement : la page se dessine tout de suite, le contenu
+   arrive ensuite, plutôt qu'un écran figé le temps de la requête. */
+@keyframes pulsation {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.squelette {
+  background: var(--color-surface-2);
+  border-radius: 6px;
+  animation: pulsation 1.4s ease-in-out infinite;
+}

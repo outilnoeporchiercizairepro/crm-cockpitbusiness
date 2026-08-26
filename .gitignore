@@ -1,0 +1,33 @@
+# Dépendances
+node_modules/
+
+# Build Next.js
+.next/
+out/
+next-env.d.ts
+
+# Variables d'environnement — contiennent les clés Supabase.
+# La clé de service donne les pleins droits sur la base : elle ne doit
+# jamais partir sur GitHub. Seul .env.example, qui n'a que des marqueurs,
+# est versionné.
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+*.icloud
+# Doublons créés par la synchronisation iCloud
+*\ 2.*
+
+# Logs et divers
+*.log
+npm-debug.log*
+.vercel
+
+# Import ponctuel du COCKPIT SUIVI : contient les coordonnées réelles des
+# prospects (noms, e-mails, téléphones). Déjà exécuté, donc sans valeur pour
+# le dépôt — et un fichier de données clients n'a rien à faire dans un dépôt
+# de code, public ou non. La correspondance des colonnes est décrite dans
+# le README.
+import-cockpit.sql

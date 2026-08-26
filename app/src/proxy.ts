@@ -6,6 +6,14 @@ import { envSupabase } from '@/lib/env-supabase'
 const PUBLIC_PATHS = ['/login', '/desactive', '/api/sante']
 
 export async function proxy(request: NextRequest) {
+  // La sonde de vivacité répond avant toute lecture de configuration : si
+  // les variables d'environnement manquent, le conteneur reste « sain » et
+  // l'erreur remonte sous la forme d'un 500 explicite plutôt que d'un
+  // « Bad Gateway » du reverse proxy, qui ne dit rien de la cause.
+  if (request.nextUrl.pathname === '/api/sante') {
+    return NextResponse.next({ request })
+  }
+
   let response = NextResponse.next({ request })
   const { url: urlSupabase, cleAnon } = envSupabase()
 

@@ -107,7 +107,17 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY
 SUPABASE_SECRET_KEY
 ```
 
-Sonde de santé : `GET /api/sante`.
+**Port du conteneur : `3000`.** C'est la valeur à mettre dans le champ
+*Container Port* de Dokploy. Le port 80 n'apparaît que dans le service nginx
+du `docker-compose.yml`, qui ne sert pas ici — un « Bad Gateway » vient
+presque toujours de là : Traefik frappe à une porte où personne n'écoute.
+
+Sonde de santé : `GET /api/sante`. Elle répond même si la configuration
+Supabase manque, pour que l'erreur remonte en 500 explicite plutôt qu'en
+« Bad Gateway ».
+
+DNS : un enregistrement `A` du domaine vers l'adresse IP du VPS. Le
+certificat TLS est demandé par Dokploy une fois le domaine résolu.
 
 ### Sur un VPS avec Docker seul
 

@@ -8,6 +8,13 @@
 **/out
 **/dist
 
+# Lockfiles concurrents : le Dockerfile installe avec npm ci, à partir de
+# package-lock.json. Laisser entrer un yarn.lock ou un pnpm-lock.yaml ne
+# ferait qu'introduire une ambiguïté sur les versions installées.
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
 # Secrets. Le point le plus important de ce fichier : sans cette ligne, un
 # .env.local présent sur la machine partirait dans le contexte de build et
 # pourrait finir dans une couche de l'image.

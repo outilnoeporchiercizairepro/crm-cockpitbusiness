@@ -1,0 +1,38 @@
+# Ce qui n'a rien à faire dans le contexte de build : chaque fichier listé
+# ici est un fichier que Docker n'a pas à transférer, et surtout que l'image
+# ne peut pas embarquer par accident.
+
+# Dépendances et builds : reconstruits dans l'image
+**/node_modules
+**/.next
+**/out
+**/dist
+
+# Secrets. Le point le plus important de ce fichier : sans cette ligne, un
+# .env.local présent sur la machine partirait dans le contexte de build et
+# pourrait finir dans une couche de l'image.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Données clients : l'import du COCKPIT contient les coordonnées réelles
+# des prospects. Il n'a rien à faire dans une image.
+import-cockpit.sql
+*.xlsx
+*.csv
+
+# Historique et outillage local
+.git
+.gitignore
+.claude
+.vscode
+.idea
+
+# Documentation : n'entre pas dans le runtime
+*.md
+!app/README.md
+
+# Système
+**/.DS_Store
+**/*.log
+**/* 2.*

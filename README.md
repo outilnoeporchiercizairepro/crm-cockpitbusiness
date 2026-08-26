@@ -85,6 +85,55 @@ restent désactivés ; le reste du CRM fonctionne normalement. **Ne la préfixe 
 `NEXT_PUBLIC_`** : elle partirait dans le bundle navigateur et donnerait les pleins
 droits sur la base à n'importe qui.
 
+## Déploiement
+
+| Fichier | Rôle |
+|---|---|
+| `Dockerfile` | Image de production, build en trois étapes, sortie autonome de Next |
+| `.dockerignore` | Ce qui n'entre pas dans le contexte de build — secrets et données clients en tête |
+| `nginx.conf` | Reverse proxy, **uniquement** pour un déploiement Docker « nu » |
+| `docker-compose.yml` | Assemble l'application et nginx sur un VPS |
+
+### Sur Dokploy
+
+Dokploy embarque déjà Traefik comme reverse proxy et gère le certificat TLS.
+**N'utilise ni `nginx.conf` ni `docker-compose.yml`** : ils feraient doublon et
+créeraient un second point d'entrée. Pointe simplement Dokploy sur le dépôt et
+sur le `Dockerfile`, puis renseigne :
+
+*Build arguments* (inscrits dans le bundle navigateur au moment du build) :
+
+```
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY
+```
+
+*Variables d'environnement* (au démarrage du conteneur) : les deux ci-dessus,
+**plus** `SUPABASE_SECRET_KEY`.
+
+Sonde de santé : `GET /api/sante`.
+
+### Sur un VPS avec Docker seul
+
+```bash
+docker compose build --build-arg NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxx
+```
+
+puis `docker compose up -d`. Le TLS reste à ajouter : les blocs `listen 443` et
+la redirection HTTP sont préparés en commentaire dans `nginx.conf`.
+
+### Le piège des variables d'environnement
+
+Next **inscrit les variables `NEXT_PUBLIC_*` dans le bundle navigateur au
+moment du build**, pas au démarrage. Les fournir uniquement à l'exécution
+produit une image qui compile sans erreur puis échoue à la connexion, le
+client cherchant à joindre `undefined`. Le Dockerfile échoue donc
+volontairement tôt si elles manquent.
+
+À l'inverse, **`SUPABASE_SECRET_KEY` ne doit jamais être un build-arg** : un
+argument de build reste lisible dans les couches de l'image, et cette clé
+contourne toute la RLS. Elle se fournit à l'exécution, uniquement.
+
 ## Lancer l'application
 
 ```bash
@@ -480,6 +529,12 @@ Ce qui a changé sur ce front :
   en bout : la clé n'est pas récupérable depuis mes outils, c'est à toi de la
   coller. Leur garde-fou d'accès (`exigerAdmin`) et la RLS sont testés, mais l'appel
   à l'API Admin de Supabase ne l'est pas. À vérifier au premier compte que tu crées.
+- **Le `Dockerfile` et le `nginx.conf` n'ont pas pu être exécutés** : ni Docker
+  ni nginx ne sont installés sur cette machine. Ce qui a été vérifié : la sortie
+  autonome démarre comme le fera l'image (`node server.js`), la sonde `/api/sante`
+  répond 200, `/login` reste public et `/contacts` redirige toujours sans session.
+  Ce qui reste à confirmer au premier déploiement : que `docker build` aboutit et
+  que `nginx -t` valide la configuration.
 - **L'import CSV ne reprend que les champs de contact** (Nom, Mail, Téléphone,
   Entreprise, Poste, Secteur, Effectif, Source, Notes) — il reconnaît les libellés
   de ton COCKPIT SUIVI. Il n'importe **pas** le statut, le montant ni le mode de

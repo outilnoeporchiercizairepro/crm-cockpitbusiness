@@ -1,0 +1,52 @@
+# =====================================================================
+# Déploiement Docker « nu » sur un VPS, avec nginx en frontal.
+#
+# Sur Dokploy, n'utilise PAS ce fichier : la plateforme construit l'image
+# depuis le Dockerfile et place Traefik devant. Le service nginx ferait
+# doublon.
+#
+#   docker compose build --build-arg NEXT_PUBLIC_SUPABASE_URL=... \
+#                        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+#   docker compose up -d
+# =====================================================================
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Inscrites dans le bundle navigateur au moment du build.
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    restart: unless-stopped
+    environment:
+      # Fournie à l'exécution seulement : en build-arg, elle resterait
+      # lisible dans les couches de l'image.
+      SUPABASE_SECRET_KEY: ${SUPABASE_SECRET_KEY}
+      # Renseignées aussi ici : le serveur Next les lit côté rendu.
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider",
+             "http://127.0.0.1:3000/api/sante"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/crm-altitude.conf:ro
+      # - ./certbot/conf:/etc/letsencrypt:ro
+      # - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      app:
+        condition: service_healthy

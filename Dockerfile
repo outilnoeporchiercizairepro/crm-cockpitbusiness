@@ -59,8 +59,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 USER nextjs
 EXPOSE 3000
 
-# wget est présent dans l'image alpine de node : pas de dépendance à ajouter.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/sante || exit 1
+# Sonde écrite avec node : c'est le seul binaire dont la présence dans
+# l'image soit garantie. S'appuyer sur wget ou curl fait dépendre la santé
+# du conteneur d'un outil qui peut manquer — et une sonde qui échoue
+# toujours fait sortir le conteneur du routage, ce qui se manifeste par un
+# 502 sans autre explication.
+#
+# start-period généreux : le premier démarrage doit avoir le temps de se
+# faire avant que les échecs ne comptent.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/sante').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server.js"]

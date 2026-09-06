@@ -3,7 +3,10 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { majLigneConfig, creerLigneConfig } from '@/app/actions'
+import { normaliserCle } from '@/lib/codes'
 import { Carte, Badge, styleChamp, styleBouton } from '@/components/ui'
+import { TONS, FOND_TON, BORDURE_TON } from '@/lib/tons'
+import type { TonSource } from '@/lib/database.types'
 
 type LigneConfig = {
   id: string
@@ -13,6 +16,7 @@ type LigneConfig = {
   is_active: boolean
   is_won?: boolean
   is_lost?: boolean
+  color?: TonSource
 }
 
 export function TableConfig({
@@ -32,6 +36,14 @@ export function TableConfig({
   const [, demarrer] = useTransition()
   const [erreur, setErreur] = useState('')
   const [nouveau, setNouveau] = useState('')
+  const [nouveauCode, setNouveauCode] = useState('')
+
+  // Les codes d'étapes sont lus en dur par l'app et par la fonction d'entrée
+  // n8n : les laisser modifier casserait la prise de RDV en silence.
+  const codeModifiable = table !== 'pipeline_stages'
+  // Sources et étapes s'affichent en étiquette dans tout le CRM ; les motifs
+  // de perte n'apparaissent qu'en texte, une couleur n'y servirait à rien.
+  const couleurModifiable = table === 'sources' || table === 'pipeline_stages'
 
   function agir(fn: () => Promise<{ ok: true } | { ok: false; erreur: string }>) {
     demarrer(async () => {
@@ -65,10 +77,56 @@ export function TableConfig({
               className="min-w-0 flex-1 rounded border border-transparent bg-transparent px-2 py-1 text-sm outline-none transition hover:border-bordure focus:border-altitude"
             />
 
-            <code className="hidden shrink-0 text-xs text-texte-faible sm:block">{l.key}</code>
+            {codeModifiable ? (
+              <input
+                defaultValue={l.key}
+                title="Code envoyé par n8n et les imports CSV"
+                onBlur={(e) => {
+                  const voulu = normaliserCle(e.target.value)
+                  if (voulu === l.key) { e.target.value = l.key; return }
+                  if (!voulu) {
+                    e.target.value = l.key
+                    setErreur('Code invalide : lettres et chiffres uniquement.')
+                    return
+                  }
+                  agir(() => majLigneConfig(table, l.id, { key: voulu }))
+                }}
+                className="w-28 shrink-0 rounded border border-transparent bg-transparent px-2 py-1 font-mono text-xs text-texte-faible outline-none transition hover:border-bordure focus:border-altitude focus:text-texte"
+              />
+            ) : (
+              <code className="hidden shrink-0 text-xs text-texte-faible sm:block">{l.key}</code>
+            )}
 
             {l.is_won && <Badge ton="succes">Gagné</Badge>}
             {l.is_lost && <Badge ton="danger">Perdu</Badge>}
+
+            {couleurModifiable && (
+              <div className="flex shrink-0 items-center gap-1">
+                {TONS.map((t) => {
+                  const choisi = l.color === t.ton
+                  return (
+                    <button
+                      key={t.ton}
+                      title={t.nom}
+                      aria-label={`Étiquette ${t.nom}`}
+                      aria-pressed={choisi}
+                      onClick={() => agir(() => majLigneConfig(table, l.id, { color: t.ton }))}
+                      className={`h-4 w-4 rounded-full border transition ${BORDURE_TON[t.ton]} ${FOND_TON[t.ton]} ${
+                        choisi
+                          ? 'ring-2 ring-texte-doux ring-offset-1 ring-offset-surface'
+                          : 'opacity-60 hover:opacity-100'
+                      }`}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
+            {couleurModifiable && (
+              <Badge ton={l.color ?? 'altitude'} className="hidden shrink-0 md:inline-flex">
+                {l.label}
+              </Badge>
+            )}
 
             <button
               onClick={() => agir(() => majLigneConfig(table, l.id, { is_active: !l.is_active }))}
@@ -85,19 +143,30 @@ export function TableConfig({
       </ul>
 
       {creation && (
-        <div className="flex gap-2 border-t border-bordure p-3">
+        <div className="flex flex-wrap gap-2 border-t border-bordure p-3">
           <input
             value={nouveau}
             onChange={(e) => setNouveau(e.target.value)}
             placeholder="Nouveau libellé…"
-            className={styleChamp}
+            className={`${styleChamp} min-w-40 flex-1`}
+          />
+          <input
+            value={nouveauCode}
+            onChange={(e) => setNouveauCode(e.target.value)}
+            placeholder="code"
+            title="Laisse vide pour le dériver du libellé"
+            className={`${styleChamp} w-28 shrink-0 font-mono`}
           />
           <button
             disabled={!nouveau.trim()}
             onClick={() =>
               agir(async () => {
-                const r = await creerLigneConfig(table as 'sources' | 'lost_reasons', nouveau.trim())
-                if (r.ok) setNouveau('')
+                const r = await creerLigneConfig(
+                  table as 'sources' | 'lost_reasons',
+                  nouveau.trim(),
+                  nouveauCode.trim() || undefined,
+                )
+                if (r.ok) { setNouveau(''); setNouveauCode('') }
                 return r
               })
             }
@@ -105,6 +174,13 @@ export function TableConfig({
           >
             Ajouter
           </button>
+          <p className="w-full text-xs text-texte-faible">
+            Code enregistré :{' '}
+            <code className="text-texte-doux">
+              {normaliserCle(nouveauCode.trim() || nouveau) || '—'}
+            </code>
+            {' · '}laisse le champ vide pour le dériver du libellé.
+          </p>
         </div>
       )}
     </Carte>

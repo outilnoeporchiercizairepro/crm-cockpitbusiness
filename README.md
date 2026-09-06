@@ -394,7 +394,7 @@ Corps :
   "p_email": "marie.dubois@exemple.fr",
   "p_telephone": "+33 6 11 22 33 44",
   "p_entreprise": "Dubois Conseil",
-  "p_source": "setter",
+  "p_source": "sl",
   "p_type": "closing",
   "p_duree_min": 45,
   "p_lieu": "https://meet.google.com/abc-defg",
@@ -405,6 +405,31 @@ Corps :
 Seuls `p_nom` et `p_date_rdv` sont obligatoires. `p_date_rdv` doit être une date
 ISO 8601 **avec fuseau** — sans lui, Postgres l'interprète en UTC et le RDV
 apparaît décalé de deux heures l'été.
+
+`p_source` attend le **code** d'une ligne de la table `sources`, pas son
+libellé : `"p_source": "sl"` si tu as déclaré `sl` → « Setter » dans
+Administration → Sources d'acquisition. C'est aussi ce que reconnaît la
+colonne source d'un import CSV.
+
+La comparaison est **exacte et sensible à la casse** : `SL`, `Setter` ou
+`setter` ne correspondent pas au code `sl`. Les codes réellement en base se
+lisent dans l'admin, ou en SQL :
+
+```sql
+select key, label, is_active from sources order by position;
+```
+
+La source n'est pas portée par le rendez-vous lui-même : elle est posée sur le
+**contact** et sur l'**opportunité**, qui sont ce que le dashboard découpe par
+source. Un RDV ne peut donc pas avoir une source différente de son
+opportunité — et un contact déjà connu garde la source de son premier passage,
+la fonction ne l'écrase pas.
+
+> **Piège.** Un code absent de la table `sources` — ou désactivé — ne provoque
+> aucune erreur : le RDV est créé, simplement sans source, et l'affaire
+> disparaît des lignes « Par source » du dashboard. Déclare le code dans
+> l'admin **avant** de le brancher dans n8n, et vérifie qu'une nouvelle entrée
+> ressort bien avec sa source.
 
 Ce que la fonction fait :
 

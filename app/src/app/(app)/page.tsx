@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite, profilCourant } from '@/lib/session'
 import { Carte, EnTetePage, Vide, Badge, LienOpportunite } from '@/components/ui'
 import { IssueRdv } from '@/components/issue-rdv'
+import { EtiquetteSource } from '@/components/etiquette-source'
 import { ListeRelances, type Relance } from '@/components/liste-relances'
 import { heure, jourHeure, nomContact, relatif, enRetard, LIBELLE_RDV } from '@/lib/format'
+import type { TonSource } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +22,7 @@ export default async function MaJournee() {
     profilCourant(),
     supabase
       .from('appointments')
-      .select('*, contacts(full_name, company, phone)')
+      .select('*, contacts(full_name, company, phone, sources(label, color))')
       .eq('host_id', moi.id)
       .eq('status', 'planifie')
       .gte('scheduled_at', debutJour.toISOString())
@@ -37,7 +39,7 @@ export default async function MaJournee() {
 
     supabase
       .from('opportunities')
-      .select('*, contacts(full_name, company), pipeline_stages(key, label)')
+      .select('*, contacts(full_name, company, sources(label, color)), pipeline_stages(key, label)')
       .eq('setter_id', moi.id)
       .is('won_at', null)
       .is('lost_at', null)
@@ -50,8 +52,10 @@ export default async function MaJournee() {
       .order('position').limit(1).maybeSingle(),
   ])
 
+  // « lead » et non « nouveau » : cette dernière étape n'a jamais existé en
+  // base, le filtre ne renvoyait donc jamais rien et la section restait vide.
   const aContacter = (nouveaux.data ?? []).filter(
-    (o) => (o.pipeline_stages as unknown as { key: string } | null)?.key === 'nouveau',
+    (o) => (o.pipeline_stages as unknown as { key: string } | null)?.key === 'lead',
   )
 
   const relances: Relance[] = (taches.data ?? []).map((t) => {
@@ -90,16 +94,22 @@ export default async function MaJournee() {
         {!!(rdvs.data ?? []).length && (
           <Section titre="RDV du jour" compte={rdvs.data!.length}>
             {rdvs.data!.map((r) => {
-              const c = r.contacts as unknown as { full_name: string; company: string | null; phone: string | null } | null
+              const c = r.contacts as unknown as {
+                full_name: string; company: string | null; phone: string | null
+                sources: { label: string; color: TonSource } | null
+              } | null
               return (
                 <div key={r.id} className="flex items-start gap-3 px-4 py-3">
                   <div className="w-12 shrink-0 pt-0.5 text-sm font-medium tabular-nums text-altitude">
                     {heure(r.scheduled_at)}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <LienOpportunite id={r.opportunity_id} className="block truncate text-sm font-medium">
-                      {nomContact(c)}
-                    </LienOpportunite>
+                    <div className="flex items-center gap-1.5">
+                      <LienOpportunite id={r.opportunity_id} className="min-w-0 truncate text-sm font-medium">
+                        {nomContact(c)}
+                      </LienOpportunite>
+                      <EtiquetteSource label={c?.sources?.label} ton={c?.sources?.color} />
+                    </div>
                     <p className="mt-0.5 truncate text-xs text-texte-faible">
                       {LIBELLE_RDV[r.kind]}
                       {c?.company ? ` · ${c.company}` : ''}
@@ -135,13 +145,19 @@ export default async function MaJournee() {
         {!!aContacter.length && (
           <Section titre="Leads à contacter" compte={aContacter.length}>
             {aContacter.slice(0, 12).map((o) => {
-              const c = o.contacts as unknown as { full_name: string; company: string | null } | null
+              const c = o.contacts as unknown as {
+                full_name: string; company: string | null
+                sources: { label: string; color: TonSource } | null
+              } | null
               return (
                 <div key={o.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="min-w-0 flex-1">
-                    <LienOpportunite id={o.id} className="block truncate text-sm font-medium">
-                      {nomContact(c)}
-                    </LienOpportunite>
+                    <div className="flex items-center gap-1.5">
+                      <LienOpportunite id={o.id} className="min-w-0 truncate text-sm font-medium">
+                        {nomContact(c)}
+                      </LienOpportunite>
+                      <EtiquetteSource label={c?.sources?.label} ton={c?.sources?.color} />
+                    </div>
                     <p className="mt-0.5 truncate text-xs text-texte-faible">
                       {c?.company ?? 'Entreprise inconnue'} · créé {relatif(o.created_at)}
                     </p>

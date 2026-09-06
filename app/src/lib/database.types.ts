@@ -25,6 +25,9 @@ export type Profile = {
   updated_at: string
 }
 
+/** Tons du composant Badge — la palette est contrainte côté base. */
+export type TonSource = 'neutre' | 'altitude' | 'succes' | 'alerte' | 'danger' | 'violet'
+
 export type ConfigRow = {
   id: string
   key: string
@@ -37,9 +40,10 @@ export type ConfigRow = {
 export type PipelineStage = ConfigRow & {
   is_won: boolean
   is_lost: boolean
+  color: TonSource
 }
 
-export type Source = ConfigRow
+export type Source = ConfigRow & { color: TonSource }
 export type LostReason = ConfigRow
 
 export type Contact = {

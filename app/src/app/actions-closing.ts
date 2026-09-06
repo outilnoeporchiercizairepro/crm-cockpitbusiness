@@ -179,6 +179,16 @@ export async function cloturerEnAttente(
   // celle saisie ici s'y ajoute sans les remplacer.
   await marquerRdvHonore(rdvId)
 
+  // Le closing a eu lieu : l'affaire quitte « Closing planifié » pour
+  // « En attente », qui ne désigne plus que l'attente d'une réponse.
+  const { data: etape } = await supabase
+    .from('pipeline_stages').select('id').eq('key', 'en_attente').maybeSingle()
+  if (etape) {
+    const { error: eEtape } = await supabase
+      .from('opportunities').update({ stage_id: etape.id }).eq('id', opportuniteId)
+    if (eEtape) return echec(eEtape, "Impossible de passer l'affaire en attente.")
+  }
+
   const { error } = await supabase.from('tasks').insert({
     opportunity_id: opportuniteId,
     contact_id: contactId,

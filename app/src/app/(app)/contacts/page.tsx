@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite, profilCourant } from '@/lib/session'
 import { TableContacts, type LigneContact } from '@/components/table-contacts'
+import type { TonSource } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,14 +18,14 @@ export default async function Contacts() {
       .from('contacts')
       .select(`
         id, full_name, email, phone, company, icp, owner_id, created_at,
-        sources(label),
+        sources(label, color),
         proprietaire:profiles!contacts_owner_id_fkey(full_name),
         opportunities(id, amount_signed, amount_proposed,
-                      pipeline_stages(label, is_won, is_lost))
+                      pipeline_stages(label, is_won, is_lost, color))
       `)
       .order('created_at', { ascending: false })
       .limit(1000),
-    supabase.from('sources').select('id, label').eq('is_active', true).order('position'),
+    supabase.from('sources').select('id, label, color').eq('is_active', true).order('position'),
   ])
 
   const lignes: LigneContact[] = (contacts ?? []).map((c) => {
@@ -32,7 +33,7 @@ export default async function Contacts() {
       id: string
       amount_signed: number | null
       amount_proposed: number | null
-      pipeline_stages: { label: string; is_won: boolean; is_lost: boolean } | null
+      pipeline_stages: { label: string; is_won: boolean; is_lost: boolean; color: TonSource } | null
     }[] | null)?.[0]
 
     return {
@@ -44,11 +45,13 @@ export default async function Contacts() {
       icp: c.icp,
       cree_le: c.created_at,
       source: (c.sources as unknown as { label: string } | null)?.label ?? null,
+      sourceTon: (c.sources as unknown as { color: TonSource } | null)?.color ?? null,
       proprietaire: (c.proprietaire as unknown as { full_name: string } | null)?.full_name ?? null,
       estMoi: c.owner_id === moi.id,
       sansProprietaire: c.owner_id === null,
       opportuniteId: opp?.id ?? null,
       etape: opp?.pipeline_stages?.label ?? null,
+      etapeTon: opp?.pipeline_stages?.color ?? null,
       gagnee: opp?.pipeline_stages?.is_won ?? false,
       perdue: opp?.pipeline_stages?.is_lost ?? false,
       montant: opp?.amount_signed ?? opp?.amount_proposed ?? null,

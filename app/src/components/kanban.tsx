@@ -10,6 +10,8 @@ import { deplacerEtape } from '@/app/actions'
 import { createClient } from '@/lib/supabase/client'
 import { euros, nomContact } from '@/lib/format'
 import { Badge, styleChamp, styleChampInline } from '@/components/ui'
+import { EtiquetteSource } from '@/components/etiquette-source'
+import { FOND_TON } from '@/lib/tons'
 import type { PipelineStage } from '@/lib/database.types'
 import type { CarteOpportunite } from '@/app/(app)/pipeline/page'
 
@@ -202,7 +204,7 @@ function Colonne({
   const { setNodeRef, isOver } = useDroppable({ id: etape.id })
 
   const total = cartes.reduce((s, c) => s + (c.amount_signed ?? c.amount_proposed ?? 0), 0)
-  const pastille = etape.is_won ? 'bg-succes' : etape.is_lost ? 'bg-danger' : 'bg-altitude'
+  const pastille = FOND_TON[etape.color ?? 'altitude']
 
   // Repliée, la colonne reste une cible de dépôt : on doit pouvoir y glisser
   // une carte sans avoir à la déplier d'abord.
@@ -318,6 +320,7 @@ function Carte({
       )}
 
       <div className="mt-2 flex flex-wrap items-center gap-1">
+        <EtiquetteSource label={carte.source} ton={carte.sourceTon} />
         {montant ? <Badge ton="altitude">{euros(montant)}</Badge> : null}
         {carte.is_no_show && <Badge ton="danger">No-show</Badge>}
         {carte.is_nurturing && <Badge ton="violet">Nurturing</Badge>}

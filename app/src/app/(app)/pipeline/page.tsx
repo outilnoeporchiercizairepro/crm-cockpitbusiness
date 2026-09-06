@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite } from '@/lib/session'
 import { Kanban } from '@/components/kanban'
 import { EnTetePage } from '@/components/ui'
-import type { PipelineStage } from '@/lib/database.types'
+import type { PipelineStage, TonSource } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +19,7 @@ export type CarteOpportunite = {
   setter: string | null
   closer: string | null
   source: string | null
+  sourceTon: TonSource | null
 }
 
 export default async function Pipeline({
@@ -40,11 +41,11 @@ export default async function Pipeline({
         contacts(full_name, company),
         setter:profiles!opportunities_setter_id_fkey(full_name),
         closer:profiles!opportunities_closer_id_fkey(full_name),
-        sources(label)
+        sources(label, color)
       `)
       .order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name'),
-    supabase.from('sources').select('id, label').eq('is_active', true).order('position'),
+    supabase.from('sources').select('id, label, color').eq('is_active', true).order('position'),
   ])
 
   const etapes = (etapesRes.data ?? []) as PipelineStage[]
@@ -66,6 +67,7 @@ export default async function Pipeline({
     setter: (o.setter as unknown as { full_name: string } | null)?.full_name ?? null,
     closer: (o.closer as unknown as { full_name: string } | null)?.full_name ?? null,
     source: (o.sources as unknown as { label: string } | null)?.label ?? null,
+    sourceTon: (o.sources as unknown as { color: TonSource } | null)?.color ?? null,
   }))
 
   return (

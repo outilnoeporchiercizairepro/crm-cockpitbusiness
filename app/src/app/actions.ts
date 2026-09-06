@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite, profilCourant } from '@/lib/session'
-import type { ActivityType, ActivityDirection, AppointmentKind, AppointmentStatus, IcpStatus, PaymentPlan, PaymentProcessor, LegalEntity } from '@/lib/database.types'
+import { normaliserCle } from '@/lib/codes'
+import type { ActivityType, ActivityDirection, AppointmentKind, AppointmentStatus, IcpStatus, PaymentPlan, PaymentProcessor, LegalEntity, TonSource } from '@/lib/database.types'
 
 export type Resultat = { ok: true } | { ok: false; erreur: string }
 
@@ -14,6 +15,29 @@ function echec(e: { message: string } | null, defaut: string): Resultat {
     return { ok: false, erreur: "Tu n'as pas les droits sur cet élément." }
   }
   return { ok: false, erreur: e.message || defaut }
+}
+
+/**
+ * Première étape du pipeline : la plus à gauche du kanban, hors gagné/perdu.
+ *
+ * Résolue par position et non par clé en dur. Les précédentes versions
+ * cherchaient `key = 'nouveau'`, une étape qui n'a jamais existé en base :
+ * `.single()` échouait en silence et le contact était créé sans opportunité,
+ * donc absent du pipeline et de tous les taux de conversion.
+ */
+async function premiereEtape(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<{ id: string } | null> {
+  const { data } = await supabase
+    .from('pipeline_stages')
+    .select('id')
+    .eq('is_active', true)
+    .eq('is_won', false)
+    .eq('is_lost', false)
+    .order('position')
+    .limit(1)
+    .maybeSingle()
+  return data
 }
 
 /* ------------------------------------------------------------------ contacts */
@@ -46,25 +70,30 @@ export async function creerContact(form: FormData): Promise<Resultat> {
   if (error) return echec(error, 'Création impossible.')
 
   // Un contact sans opportunité n'entre pas dans l'entonnoir : on l'ouvre tout de suite.
-  const { data: etape } = await supabase
-    .from('pipeline_stages')
-    .select('id')
-    .eq('key', 'nouveau')
-    .single()
-
-  if (etape && data) {
-    await supabase.from('opportunities').insert({
-      contact_id: data.id,
-      stage_id: etape.id,
-      source_id: source_id || null,
-      setter_id: profil.role === 'closer' ? null : profil.id,
-      closer_id: profil.role === 'closer' ? profil.id : null,
-      created_by: profil.id,
-    })
+  const etape = await premiereEtape(supabase)
+  if (!etape) {
+    return {
+      ok: false,
+      erreur:
+        "Contact créé, mais aucune étape de pipeline active n'est configurée : "
+        + "son opportunité n'a pas pu être ouverte. Vérifie l'écran d'administration.",
+    }
   }
+
+  const { error: eOpp } = await supabase.from('opportunities').insert({
+    contact_id: data.id,
+    stage_id: etape.id,
+    source_id: source_id || null,
+    setter_id: profil.role === 'closer' ? null : profil.id,
+    closer_id: profil.role === 'closer' ? profil.id : null,
+    created_by: profil.id,
+  })
 
   revalidatePath('/contacts')
   revalidatePath('/pipeline')
+  if (eOpp) {
+    return { ok: false, erreur: `Contact créé, mais sans opportunité : ${eOpp.message}` }
+  }
   return { ok: true }
 }
 
@@ -87,6 +116,47 @@ export async function majContact(id: string, form: FormData): Promise<Resultat> 
   revalidatePath('/contacts')
   revalidatePath('/pipeline')
   return echec(error, 'Modification impossible.')
+}
+
+/**
+ * Change la source d'une affaire depuis sa fiche.
+ *
+ * Écrit sur le contact ET sur l'opportunité : le dashboard découpe par
+ * `opportunities.source_id`, la liste Contacts affiche `contacts.source_id`.
+ * N'en corriger qu'un seul ferait diverger les deux écrans sur la même
+ * affaire — précisément ce qu'on cherche à réparer en saisissant la source.
+ */
+export async function definirSource(
+  opportuniteId: string,
+  contactId: string,
+  sourceId: string | null,
+): Promise<Resultat> {
+  await exigerIdentite()
+  const supabase = await createClient()
+
+  const { error: eOpp } = await supabase
+    .from('opportunities')
+    .update({ source_id: sourceId })
+    .eq('id', opportuniteId)
+  if (eOpp) return echec(eOpp, 'Modification impossible.')
+
+  const { error: eContact } = await supabase
+    .from('contacts')
+    .update({ source_id: sourceId })
+    .eq('id', contactId)
+  if (eContact) {
+    return {
+      ok: false,
+      erreur: `Source posée sur l'affaire mais pas sur le contact : ${eContact.message}`,
+    }
+  }
+
+  revalidatePath(`/opportunites/${opportuniteId}`)
+  revalidatePath('/contacts')
+  revalidatePath('/pipeline')
+  revalidatePath('/dashboard')
+  revalidatePath('/')
+  return { ok: true }
 }
 
 export async function attribuerContact(id: string): Promise<Resultat> {
@@ -303,35 +373,76 @@ export async function rouvrirTache(id: string): Promise<Resultat> {
 
 /* -------------------------------------------------------------------- admin */
 
+function echecConfig(e: { message: string } | null, defaut: string): Resultat {
+  // 23505 = unique_violation. Le message brut de Postgres nomme la contrainte,
+  // pas le problème : deux lignes ne peuvent pas partager le même code.
+  if (e && (e.message.includes('duplicate key') || e.message.includes('23505'))) {
+    return { ok: false, erreur: 'Ce code est déjà utilisé par une autre ligne.' }
+  }
+  return echec(e, defaut)
+}
+
 export async function majLigneConfig(
   table: 'pipeline_stages' | 'sources' | 'lost_reasons',
   id: string,
-  champs: { label?: string; position?: number; is_active?: boolean },
+  champs: { label?: string; key?: string; color?: TonSource; position?: number; is_active?: boolean },
 ): Promise<Resultat> {
   const supabase = await createClient()
-  const { error } = await supabase.from(table).update(champs).eq('id', id)
+
+  // Sources et étapes portent une couleur d'étiquette ; les motifs de perte
+  // n'apparaissent nulle part sous forme de badge, donc non.
+  const { color, ...communs } = champs
+  const porteUneCouleur = table === 'sources' || table === 'pipeline_stages'
+  if (color !== undefined && !porteUneCouleur) {
+    return { ok: false, erreur: "Les motifs de perte ne portent pas de couleur d'étiquette." }
+  }
+
+  // Les clés d'étapes sont lues en dur (« lead », « closing_planifie »,
+  // « en_attente ») par l'app et par la fonction d'entrée n8n : les rendre
+  // modifiables casserait la prise de RDV sans le moindre message d'erreur.
+  if (communs.key !== undefined) {
+    if (table === 'pipeline_stages') {
+      return { ok: false, erreur: "Le code d'une étape ne se modifie pas : il est référencé par le code." }
+    }
+    const cle = normaliserCle(communs.key)
+    if (!cle) return { ok: false, erreur: 'Code invalide : lettres et chiffres uniquement.' }
+    communs.key = cle
+  }
+
+  // Appels distincts plutôt qu'un objet fourre-tout : `color` n'existe pas
+  // sur `lost_reasons`, et le typage de la table le refuserait.
+  const avecCouleur = { ...communs, ...(color !== undefined && { color }) }
+  const { error } =
+    table === 'sources'
+      ? await supabase.from('sources').update(avecCouleur).eq('id', id)
+      : table === 'pipeline_stages'
+        ? await supabase.from('pipeline_stages').update(avecCouleur).eq('id', id)
+        : await supabase.from(table).update(communs).eq('id', id)
+
   revalidatePath('/admin')
   revalidatePath('/pipeline')
-  return echec(error, 'Modification impossible.')
+  revalidatePath('/contacts')
+  revalidatePath('/')
+  return echecConfig(error, 'Modification impossible.')
 }
 
 export async function creerLigneConfig(
   table: 'sources' | 'lost_reasons',
   label: string,
+  cleSaisie?: string,
 ): Promise<Resultat> {
   const supabase = await createClient()
-  const key = label
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_|_$/g, '')
 
-  if (!key) return { ok: false, erreur: 'Libellé invalide.' }
+  if (!label.trim()) return { ok: false, erreur: 'Le libellé est obligatoire.' }
 
-  const { error } = await supabase.from(table).insert({ key, label, position: 50 })
+  // Code laissé vide = dérivé du libellé, comme avant. Renseigné, il fait foi :
+  // c'est lui que n8n enverra.
+  const key = normaliserCle(cleSaisie?.trim() || label)
+  if (!key) return { ok: false, erreur: 'Code invalide : lettres et chiffres uniquement.' }
+
+  const { error } = await supabase.from(table).insert({ key, label: label.trim(), position: 50 })
   revalidatePath('/admin')
-  return echec(error, 'Création impossible.')
+  return echecConfig(error, 'Création impossible.')
 }
 
 /* -------------------------------------------------------------------- import */
@@ -355,20 +466,23 @@ export type BilanImport = {
 /**
  * Import CSV. Une ligne sans nom est ignorée plutôt que de faire échouer
  * tout le lot : sur un export réel il y a toujours des lignes vides.
- * Chaque contact créé reçoit une opportunité en « Nouveau », sinon il
- * n'entre pas dans l'entonnoir et fausse les taux.
+ * Chaque contact créé reçoit une opportunité à la première étape du pipeline,
+ * sinon il n'entre pas dans l'entonnoir et fausse les taux.
  */
 export async function importerContacts(lignes: LigneImport[]): Promise<BilanImport> {
   const profil = await exigerIdentite()
   const supabase = await createClient()
   const erreurs: string[] = []
 
-  const [{ data: sources }, { data: etape }] = await Promise.all([
+  const [{ data: sources }, etape] = await Promise.all([
     supabase.from('sources').select('id, key'),
-    supabase.from('pipeline_stages').select('id').eq('key', 'nouveau').single(),
+    premiereEtape(supabase),
   ])
 
-  const parCle = new Map((sources ?? []).map((s) => [s.key, s.id]))
+  // Les deux côtés sont normalisés : une colonne CSV qui dit « SL » ou
+  // « Setter LinkedIn » retombe sur le même code que l'admin a enregistré.
+  // Sans ça la source est silencieusement perdue, comme sur le webhook n8n.
+  const parCle = new Map((sources ?? []).map((s) => [normaliserCle(s.key), s.id]))
 
   const valides = lignes.filter((l) => l.full_name?.trim())
   const ignores = lignes.length - valides.length
@@ -381,7 +495,7 @@ export async function importerContacts(lignes: LigneImport[]): Promise<BilanImpo
     phone: l.phone?.trim() || null,
     company: l.company?.trim() || null,
     notes: l.notes?.trim() || null,
-    source_id: l.source_key ? (parCle.get(l.source_key) ?? null) : null,
+    source_id: l.source_key ? (parCle.get(normaliserCle(l.source_key)) ?? null) : null,
     owner_id: null,
     created_by: profil.id,
   }))
@@ -390,6 +504,13 @@ export async function importerContacts(lignes: LigneImport[]): Promise<BilanImpo
 
   if (error) {
     return { ok: false, crees: 0, ignores, erreurs: [error.message] }
+  }
+
+  if (!etape) {
+    erreurs.push(
+      "Aucune étape de pipeline active : les contacts sont créés mais sans opportunité, "
+      + "donc absents du kanban et des taux.",
+    )
   }
 
   if (etape && crees?.length) {

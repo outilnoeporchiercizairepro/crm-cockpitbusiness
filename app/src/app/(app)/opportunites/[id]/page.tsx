@@ -8,8 +8,9 @@ import { BlocAction } from '@/components/bloc-action'
 import { RelanceWhatsApp } from '@/components/relance-whatsapp'
 import { Echeancier } from '@/components/echeancier'
 import { SuppressionContact } from '@/components/suppression-contact'
-import { euros, nomContact, LIBELLE_ICP } from '@/lib/format'
-import type { PipelineStage } from '@/lib/database.types'
+import { EtiquetteSource } from '@/components/etiquette-source'
+import { euros, nomContact } from '@/lib/format'
+import type { PipelineStage, Source, TonSource } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,7 @@ export default async function FicheOpportunite({
       *,
       contacts(*),
       pipeline_stages(*),
-      sources(label),
+      sources(label, color),
       lost_reasons(label),
       setter:profiles!opportunities_setter_id_fkey(id, full_name),
       closer:profiles!opportunities_closer_id_fkey(id, full_name)
@@ -44,33 +45,36 @@ export default async function FicheOpportunite({
     main_pain: string | null; icp: string; notes: string | null
   }
   const etape = opp.pipeline_stages as unknown as PipelineStage
+  const source = opp.sources as unknown as { label: string; color: TonSource } | null
 
-  const [profil, activites, rdvs, transitions, etapes, motifs, profils, taches, echeances] = await Promise.all([
-    // Déjà chargé par le layout et mémorisé pour la requête : aucun
-    // aller-retour supplémentaire.
-    profilCourant(),
-    supabase
-      .from('activities')
-      .select('*')
-      .eq('contact_id', contact.id)
-      .order('occurred_at', { ascending: false }),
-    supabase
-      // appointments a deux FK vers profiles (host_id, created_by) : il faut nommer laquelle.
-      .from('appointments')
-      .select('*, hote:profiles!appointments_host_id_fkey(full_name)')
-      .eq('opportunity_id', id)
-      .order('scheduled_at', { ascending: false }),
-    supabase
-      .from('stage_transitions')
-      .select('*, de:pipeline_stages!stage_transitions_from_stage_id_fkey(label), vers:pipeline_stages!stage_transitions_to_stage_id_fkey(label), profiles(full_name)')
-      .eq('opportunity_id', id)
-      .order('changed_at', { ascending: false }),
-    supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('lost_reasons').select('*').eq('is_active', true).order('position'),
-    supabase.from('profiles').select('id, full_name, role').eq('is_active', true).order('full_name'),
-    supabase.from('tasks').select('*').eq('opportunity_id', id).eq('status', 'a_faire').order('due_at'),
-    supabase.from('payments').select('*').eq('opportunity_id', id).order('installment_no'),
-  ])
+  const [profil, activites, rdvs, transitions, etapes, motifs, profils, taches, echeances, sources] =
+    await Promise.all([
+      // Déjà chargé par le layout et mémorisé pour la requête : aucun
+      // aller-retour supplémentaire.
+      profilCourant(),
+      supabase
+        .from('activities')
+        .select('*')
+        .eq('contact_id', contact.id)
+        .order('occurred_at', { ascending: false }),
+      supabase
+        // appointments a deux FK vers profiles (host_id, created_by) : il faut nommer laquelle.
+        .from('appointments')
+        .select('*, hote:profiles!appointments_host_id_fkey(full_name)')
+        .eq('opportunity_id', id)
+        .order('scheduled_at', { ascending: false }),
+      supabase
+        .from('stage_transitions')
+        .select('*, de:pipeline_stages!stage_transitions_from_stage_id_fkey(label), vers:pipeline_stages!stage_transitions_to_stage_id_fkey(label), profiles(full_name)')
+        .eq('opportunity_id', id)
+        .order('changed_at', { ascending: false }),
+      supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
+      supabase.from('lost_reasons').select('*').eq('is_active', true).order('position'),
+      supabase.from('profiles').select('id, full_name, role').eq('is_active', true).order('full_name'),
+      supabase.from('tasks').select('*').eq('opportunity_id', id).eq('status', 'a_faire').order('due_at'),
+      supabase.from('payments').select('*').eq('opportunity_id', id).order('installment_no'),
+      supabase.from('sources').select('*').eq('is_active', true).order('position'),
+    ])
 
   const evenements: Evenement[] = [
     ...(activites.data ?? []).map((a) => ({
@@ -118,9 +122,10 @@ export default async function FicheOpportunite({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-tight">{nomContact(contact)}</h1>
-            <Badge ton={etape.is_won ? 'succes' : etape.is_lost ? 'danger' : 'altitude'}>
+            <Badge ton={etape.color ?? 'altitude'}>
               {etape.label}
             </Badge>
+            <EtiquetteSource label={source?.label} ton={source?.color} />
             {opp.is_no_show && <Badge ton="danger">No-show</Badge>}
             {opp.is_nurturing && <Badge ton="violet">Nurturing</Badge>}
             {opp.is_disqualified && <Badge>Hors ICP — exclue des taux</Badge>}
@@ -150,7 +155,13 @@ export default async function FicheOpportunite({
       )}
 
       <div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)_320px]">
-        <PanneauContact contact={contact} libelleIcp={LIBELLE_ICP[contact.icp] ?? contact.icp} />
+        <PanneauContact
+          contact={contact}
+          contactId={contact.id}
+          opportuniteId={opp.id}
+          sourceId={opp.source_id}
+          sources={(sources.data ?? []) as Source[]}
+        />
 
         <Timeline
           evenements={evenements}

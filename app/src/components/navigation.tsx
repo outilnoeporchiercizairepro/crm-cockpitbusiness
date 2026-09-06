@@ -9,8 +9,8 @@ import type { Profile } from '@/lib/database.types'
 
 const LIENS = [
   { href: '/', label: 'Ma journée' },
-  { href: '/pipeline', label: 'Pipeline' },
   { href: '/contacts', label: 'Contacts' },
+  { href: '/pipeline', label: 'Pipeline' },
   { href: '/dashboard', label: 'Dashboard' },
 ]
 

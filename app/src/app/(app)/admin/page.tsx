@@ -33,7 +33,7 @@ export default async function Admin() {
         <TableConfig
           table="pipeline_stages"
           titre="Étapes du pipeline"
-          aide="L'ordre définit les colonnes du kanban et sert au calcul des taux de conversion. Désactiver une étape la retire du kanban sans effacer l'historique."
+          aide="L'ordre définit les colonnes du kanban et sert au calcul des taux de conversion. La couleur est celle du badge d'étape, dans le kanban comme sur les fiches et la liste des contacts. Désactiver une étape la retire du kanban sans effacer l'historique. Les codes ne sont pas modifiables : l'app et la prise de RDV automatique les lisent en dur."
           lignes={etapes.data ?? []}
           creation={false}
         />
@@ -41,7 +41,7 @@ export default async function Admin() {
         <TableConfig
           table="sources"
           titre="Sources d'acquisition"
-          aide="Le découpage du dashboard par source dépend de cette liste."
+          aide="Table de correspondance code → libellé. Le code est ce que n8n envoie dans « p_source » à la prise de RDV, et ce que reconnaît la colonne source d'un import CSV ; le libellé et sa couleur sont ce qui s'affiche partout dans le CRM. Un code inconnu passe sans erreur mais laisse le contact sans source."
           lignes={sources.data ?? []}
           creation
         />
@@ -49,7 +49,7 @@ export default async function Admin() {
         <TableConfig
           table="lost_reasons"
           titre="Motifs de perte"
-          aide="Obligatoire au passage en Perdu. C'est ce qui rend les pertes analysables."
+          aide="Obligatoire au passage en Perdu. C'est ce qui rend les pertes analysables. Le code sert aux intégrations, le libellé s'affiche dans le CRM."
           lignes={motifs.data ?? []}
           creation
         />

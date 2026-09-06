@@ -1,4 +1,6 @@
 import { Carte } from '@/components/ui'
+import { ChoixSource } from '@/components/choix-source'
+import type { Source } from '@/lib/database.types'
 
 type ContactFiche = {
   email: string | null
@@ -10,10 +12,16 @@ type ContactFiche = {
 
 export function PanneauContact({
   contact,
-  libelleIcp,
+  contactId,
+  opportuniteId,
+  sourceId,
+  sources,
 }: {
   contact: ContactFiche
-  libelleIcp: string
+  contactId: string
+  opportuniteId: string
+  sourceId: string | null
+  sources: Source[]
 }) {
   return (
     <div className="space-y-4">
@@ -30,16 +38,19 @@ export function PanneauContact({
 
       <Carte className="p-4">
         <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-texte-faible">
-          Qualification
+          Source
         </h2>
-        <dl className="space-y-2.5 text-sm">
-          <Ligne label="Statut ICP" valeur={libelleIcp} />
-        </dl>
+        <ChoixSource
+          opportuniteId={opportuniteId}
+          contactId={contactId}
+          sourceId={sourceId}
+          sources={sources}
+        />
 
         {contact.main_pain && (
           <div className="mt-3 border-t border-bordure pt-3">
             <p className="text-xs text-texte-faible">Contexte</p>
-            <p className="mt-1 text-sm text-texte-doux">{contact.main_pain}</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-texte-doux">{contact.main_pain}</p>
           </div>
         )}
       </Carte>

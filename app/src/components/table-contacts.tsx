@@ -8,7 +8,9 @@ import { PanneauNouveauContact } from '@/components/panneau-nouveau-contact'
 import { PanneauImport } from '@/components/panneau-import'
 import { SuppressionContact } from '@/components/suppression-contact'
 import { BoutonCloser } from '@/components/bouton-closer'
+import { EtiquetteSource } from '@/components/etiquette-source'
 import { euros, jour, initiales, LIBELLE_ICP } from '@/lib/format'
+import type { TonSource } from '@/lib/database.types'
 
 export type LigneContact = {
   id: string
@@ -19,6 +21,8 @@ export type LigneContact = {
   icp: string
   cree_le: string
   source: string | null
+  sourceTon: TonSource | null
+  etapeTon: TonSource | null
   proprietaire: string | null
   estMoi: boolean
   sansProprietaire: boolean
@@ -41,7 +45,7 @@ export function TableContacts({
   estAdmin,
 }: {
   lignes: LigneContact[]
-  sources: { id: string; label: string }[]
+  sources: { id: string; label: string; color: TonSource }[]
   estAdmin: boolean
 }) {
   const router = useRouter()
@@ -244,7 +248,7 @@ export function TableContacts({
 
                     <td className="px-4 py-2.5">
                       {l.etape ? (
-                        <Badge ton={l.gagnee ? 'succes' : l.perdue ? 'danger' : 'altitude'}>
+                        <Badge ton={l.etapeTon ?? 'altitude'}>
                           {l.etape}
                         </Badge>
                       ) : (
@@ -262,7 +266,13 @@ export function TableContacts({
                       )}
                     </td>
 
-                    <td className="px-4 py-2.5 text-texte-doux">{l.source ?? '—'}</td>
+                    <td className="px-4 py-2.5">
+                      <EtiquetteSource
+                        label={l.source}
+                        ton={l.sourceTon}
+                        vide={<span className="text-texte-faible">—</span>}
+                      />
+                    </td>
 
                     <td className="whitespace-nowrap px-4 py-2.5 text-texte-faible">
                       {jour(l.cree_le)}

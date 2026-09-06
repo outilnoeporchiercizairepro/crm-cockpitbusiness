@@ -126,6 +126,12 @@ create table sources (
   label      text not null,
   position   int  not null default 0,
   is_active  boolean not null default true,
+  -- Ton du composant Badge : reconnaître la provenance d'un lead au coup
+  -- d'œil. Palette fermée plutôt qu'hexadécimal libre, pour que l'étiquette
+  -- reste lisible sur le thème sombre comme sur le clair.
+  color      text not null default 'neutre'
+             constraint source_couleur_connue
+             check (color in ('neutre','altitude','succes','alerte','danger','violet')),
   created_at timestamptz not null default now()
 );
 
@@ -137,6 +143,11 @@ create table pipeline_stages (
   is_won     boolean not null default false,
   is_lost    boolean not null default false,
   is_active  boolean not null default true,
+  -- Même palette fermée que les sources : réglable en admin, et lisible sur
+  -- le thème sombre comme sur le clair.
+  color      text not null default 'altitude'
+             constraint etape_couleur_connue
+             check (color in ('neutre','altitude','succes','alerte','danger','violet')),
   created_at timestamptz not null default now(),
   constraint stage_not_both_won_and_lost check (not (is_won and is_lost))
 );
@@ -921,17 +932,21 @@ grant  execute on function est_actif()         to authenticated;
 -- Closé en dernier : la colonne des ventes se lit à droite du kanban, après
 -- les impasses. L'ordre des positions ne fausse pas l'entonnoir, qui exclut
 -- les étapes perdues du calcul de « position maximale atteinte ».
-insert into pipeline_stages (key, label, position, is_won, is_lost) values
-  ('lead',        'Lead',        1, false, false),
-  ('en_attente',  'En attente',  2, false, false),
-  ('perdu',       'Perdu',       3, false, true),
-  ('mauvais_icp', 'Mauvais ICP', 4, false, true),
-  ('close',       'Closé',       5, true,  false);
+-- « Closing planifié » = le RDV est pris, le closing reste à mener.
+-- « En attente »        = le closing a eu lieu, on attend la réponse.
+-- Les confondre rendait impossible de savoir combien de closings restaient.
+insert into pipeline_stages (key, label, position, is_won, is_lost, color) values
+  ('lead',             'Lead',             1, false, false, 'altitude'),
+  ('closing_planifie', 'Closing planifié', 2, false, false, 'altitude'),
+  ('en_attente',       'En attente',       3, false, false, 'altitude'),
+  ('perdu',            'Perdu',            4, false, true,  'danger'),
+  ('mauvais_icp',      'Mauvais ICP',      5, false, true,  'danger'),
+  ('close',            'Closé',            6, true,  false, 'succes');
 
 -- « Source » désigne qui amène le RDV, pas le canal d'acquisition.
-insert into sources (key, label, position) values
-  ('direct', 'Direct', 1),
-  ('setter', 'Setter', 2);
+insert into sources (key, label, position, color) values
+  ('direct', 'Direct', 1, 'altitude'),
+  ('sl',     'Setter', 2, 'violet');
 
 insert into relance_rules (label, delai_jours, position) values
   ('Relance J+2', 2, 1),
@@ -1038,8 +1053,10 @@ begin
     v_cree_opp := true;
   end if;
 
-  -- 3. Le RDV fait passer l'opportunité en « En attente ».
-  select id into v_etape from pipeline_stages where key = 'en_attente';
+  -- 3. Le RDV pris fait passer l'opportunité en « Closing planifié » : le
+  --    closing reste à mener. C'est l'issue saisie dans « Ma journée » qui
+  --    la fera basculer ensuite en « En attente », « Closé » ou « Perdu ».
+  select id into v_etape from pipeline_stages where key = 'closing_planifie';
   update opportunities set stage_id = v_etape, source_id = coalesce(source_id, v_source)
    where id = v_opp and stage_id <> v_etape;
 

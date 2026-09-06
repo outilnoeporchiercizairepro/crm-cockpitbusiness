@@ -129,3 +129,73 @@ export const styleBouton =
 
 export const styleBoutonDoux =
   'rounded-lg border border-bordure bg-surface-2 px-3.5 py-2 text-sm text-texte-doux transition hover:border-bordure-forte hover:text-texte disabled:opacity-50'
+
+/**
+ * Tableau dense, première colonne à gauche et le reste aligné à droite.
+ * `lignes` accepte des nœuds pour pouvoir teinter une valeur ou glisser un
+ * lien sans dupliquer le composant.
+ */
+export function TableauCompact({
+  titre,
+  sous,
+  colonnes,
+  lignes,
+  pied,
+  vide,
+  note,
+  className = '',
+}: {
+  titre: string
+  sous?: string
+  colonnes: string[]
+  lignes: React.ReactNode[][]
+  pied?: React.ReactNode[]
+  vide: string
+  note?: string
+  className?: string
+}) {
+  return (
+    <Carte className={`overflow-hidden ${className}`}>
+      <div className="border-b border-bordure px-4 py-3">
+        <h2 className="text-sm font-medium">{titre}</h2>
+        {sous && <p className="mt-0.5 text-xs text-texte-faible">{sous}</p>}
+      </div>
+      {!lignes.length ? (
+        <p className="px-4 py-8 text-center text-sm text-texte-faible">{vide}</p>
+      ) : (
+        <div className="scroll-fin overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-bordure text-left text-xs text-texte-faible">
+                {colonnes.map((c, i) => (
+                  <th key={c} className={`px-4 py-2 font-medium ${i > 0 ? 'text-right' : ''}`}>{c}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-bordure">
+              {lignes.map((l, i) => (
+                <tr key={i}>
+                  {l.map((v, j) => (
+                    <td key={j} className={`px-4 py-2 ${j > 0 ? 'text-right tabular-nums text-texte-doux' : ''}`}>
+                      {v}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+            {pied && (
+              <tfoot>
+                <tr className="border-t border-bordure-forte font-medium">
+                  {pied.map((v, j) => (
+                    <td key={j} className={`px-4 py-2 ${j > 0 ? 'text-right tabular-nums' : ''}`}>{v}</td>
+                  ))}
+                </tr>
+              </tfoot>
+            )}
+          </table>
+        </div>
+      )}
+      {note && <p className="border-t border-bordure px-4 py-2.5 text-xs text-texte-faible">{note}</p>}
+    </Carte>
+  )
+}

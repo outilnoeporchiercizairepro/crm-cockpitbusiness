@@ -24,6 +24,17 @@ export function heure(iso: string | null | undefined) {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
+/** « sept. 2025 » à partir d'une clé « 2025-09 » (mois calendaire, pas un instant). */
+export function mois(cle: string) {
+  const [annee, m] = cle.split('-').map(Number)
+  return new Date(annee, m - 1, 1).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
+}
+
+/** Jour local au format « YYYY-MM-DD », comparable aux colonnes `date` de Postgres. */
+export function jourIso(d = new Date()) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function jourHeure(iso: string | null | undefined) {
   if (!iso) return '—'
   return `${jour(iso)} à ${heure(iso)}`

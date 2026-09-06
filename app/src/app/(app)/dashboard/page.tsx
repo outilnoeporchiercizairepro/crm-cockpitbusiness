@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite } from '@/lib/session'
-import { Carte, EnTetePage, Stat, Vide } from '@/components/ui'
+import { Carte, EnTetePage, Stat, TableauCompact, Vide } from '@/components/ui'
 import { FiltresDashboard } from '@/components/filtres-dashboard'
+import { BlocFinancier } from '@/components/bloc-financier'
 import { euros, pct } from '@/lib/format'
 import type { PipelineStage } from '@/lib/database.types'
 
@@ -27,13 +28,16 @@ export default async function Dashboard({
   const jours = PERIODES[periode].jours
   const depuis = jours ? new Date(Date.now() - jours * 86400_000).toISOString() : null
 
-  const [etapesRes, reachRes, rdvRes, sourcesRes, profilsRes] = await Promise.all([
-    supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
-    supabase.from('v_opportunity_reach').select('*'),
-    supabase.from('appointments').select('id, kind, status, scheduled_at, host_id, opportunity_id'),
-    supabase.from('sources').select('id, label').eq('is_active', true).order('position'),
-    supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name'),
-  ])
+  const [etapesRes, reachRes, rdvRes, sourcesRes, profilsRes, ventesRes, paiementsRes] =
+    await Promise.all([
+      supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
+      supabase.from('v_opportunity_reach').select('*'),
+      supabase.from('appointments').select('id, kind, status, scheduled_at, host_id, opportunity_id'),
+      supabase.from('sources').select('id, label').eq('is_active', true).order('position'),
+      supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name'),
+      supabase.from('v_sales').select('*'),
+      supabase.from('payments').select('*').order('installment_no'),
+    ])
 
   const etapes = ((etapesRes.data ?? []) as PipelineStage[]).filter((e) => !e.is_lost)
 
@@ -61,6 +65,12 @@ export default async function Dashboard({
   /* ------------------------------------------------------------------ KPIs */
   const gagnees = opps.filter((o) => o.won_at)
   const caSigne = gagnees.reduce((s, o) => s + (o.amount_signed ?? 0), 0)
+
+  // Le bloc financier suit exactement le même périmètre que le CA signé : les
+  // deux doivent se recouper, sinon on ne sait plus lequel croire.
+  const idsGagnees = new Set(gagnees.map((o) => o.opportunity_id))
+  const ventes = (ventesRes.data ?? []).filter((v) => idsGagnees.has(v.opportunity_id))
+  const echeances = (paiementsRes.data ?? []).filter((p) => idsGagnees.has(p.opportunity_id))
 
   const rdvAboutis = rdvs.filter((r) => r.status === 'honore' || r.status === 'no_show').length
   const rdvHonores = rdvs.filter((r) => r.status === 'honore').length
@@ -251,52 +261,10 @@ export default async function Dashboard({
               vide="Aucune opportunité assignée sur la période."
             />
           </div>
+
+          <BlocFinancier ventes={ventes} echeances={echeances} />
         </>
       )}
     </div>
-  )
-}
-
-function TableauCompact({
-  titre,
-  colonnes,
-  lignes,
-  vide,
-}: {
-  titre: string
-  colonnes: string[]
-  lignes: string[][]
-  vide: string
-}) {
-  return (
-    <Carte className="overflow-hidden">
-      <h2 className="border-b border-bordure px-4 py-3 text-sm font-medium">{titre}</h2>
-      {!lignes.length ? (
-        <p className="px-4 py-8 text-center text-sm text-texte-faible">{vide}</p>
-      ) : (
-        <div className="scroll-fin overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-bordure text-left text-xs text-texte-faible">
-                {colonnes.map((c, i) => (
-                  <th key={c} className={`px-4 py-2 font-medium ${i > 0 ? 'text-right' : ''}`}>{c}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-bordure">
-              {lignes.map((l, i) => (
-                <tr key={i}>
-                  {l.map((v, j) => (
-                    <td key={j} className={`px-4 py-2 ${j > 0 ? 'text-right tabular-nums text-texte-doux' : ''}`}>
-                      {v}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Carte>
   )
 }

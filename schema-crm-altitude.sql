@@ -79,6 +79,30 @@ as $$
   select coalesce((select is_active from profiles where id = auth.uid()), false);
 $$;
 
+-- Le périmètre de sources de l'appelant. SECURITY DEFINER : ces fonctions
+-- sont appelées depuis les policies et doivent lire sans repasser par la RLS,
+-- ce qui provoquerait une récursion.
+create or replace function source_autorisee(p_source uuid)
+returns boolean
+language sql stable security definer set search_path = public
+as $$
+  select is_admin()
+      or not exists (select 1 from profile_sources where profile_id = auth.uid())
+      or exists (select 1 from profile_sources ps
+                  where ps.profile_id = auth.uid() and ps.source_id = p_source);
+$$;
+
+comment on function source_autorisee is
+  'Un compte restreint ne voit pas les affaires sans source : volontaire, sinon la restriction se contourne en laissant la source vide.';
+
+create or replace function source_du_contact(p_contact uuid)
+returns uuid language sql stable security definer set search_path = public
+as $$ select source_id from contacts where id = p_contact; $$;
+
+create or replace function source_de_l_opportunite(p_opp uuid)
+returns uuid language sql stable security definer set search_path = public
+as $$ select source_id from opportunities where id = p_opp; $$;
+
 -- Création automatique du profil à la première connexion.
 -- Le tout premier compte devient admin : sans ça, personne ne pourrait
 -- administrer quoi que ce soit sans passer par du SQL manuel.
@@ -133,6 +157,15 @@ create table sources (
              constraint source_couleur_connue
              check (color in ('neutre','altitude','succes','alerte','danger','violet')),
   created_at timestamptz not null default now()
+);
+
+-- Périmètre de visibilité d'un compte. Aucune ligne = accès à tout : sans ce
+-- défaut, introduire la restriction couperait l'accès de tous les comptes.
+create table profile_sources (
+  profile_id uuid not null references profiles(id) on delete cascade,
+  source_id  uuid not null references sources(id)  on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (profile_id, source_id)
 );
 
 create table pipeline_stages (
@@ -758,6 +791,7 @@ alter table activities        enable row level security;
 alter table appointments      enable row level security;
 alter table tasks             enable row level security;
 alter table stage_transitions enable row level security;
+alter table profile_sources   enable row level security;
 alter table payments          enable row level security;
 
 -- 13.1 Principe : tout utilisateur authentifié ET ACTIF lit tout.
@@ -768,13 +802,14 @@ create policy read_all on sources           for select to authenticated using (e
 create policy read_all on pipeline_stages   for select to authenticated using (est_actif());
 create policy read_all on lost_reasons      for select to authenticated using (est_actif());
 create policy read_all on relance_rules     for select to authenticated using (est_actif());
-create policy read_all on contacts          for select to authenticated using (est_actif());
-create policy read_all on opportunities     for select to authenticated using (est_actif());
-create policy read_all on activities        for select to authenticated using (est_actif());
-create policy read_all on appointments      for select to authenticated using (est_actif());
-create policy read_all on tasks             for select to authenticated using (est_actif());
-create policy read_all on stage_transitions for select to authenticated using (est_actif());
-create policy read_all on payments          for select to authenticated using (est_actif());
+-- Les tables de données passent par le périmètre de sources de l'appelant.
+create policy read_all on contacts          for select to authenticated using (est_actif() and source_autorisee(source_id));
+create policy read_all on opportunities     for select to authenticated using (est_actif() and source_autorisee(source_id));
+create policy read_all on activities        for select to authenticated using (est_actif() and source_autorisee(source_du_contact(contact_id)));
+create policy read_all on appointments      for select to authenticated using (est_actif() and source_autorisee(source_du_contact(contact_id)));
+create policy read_all on tasks             for select to authenticated using (est_actif() and source_autorisee(source_du_contact(contact_id)));
+create policy read_all on stage_transitions for select to authenticated using (est_actif() and source_autorisee(source_de_l_opportunite(opportunity_id)));
+create policy read_all on payments          for select to authenticated using (est_actif() and source_autorisee(source_de_l_opportunite(opportunity_id)));
 
 -- 13.2 Config : écriture admin seulement.
 create policy admin_write on sources         for all to authenticated using (is_admin()) with check (is_admin());
@@ -798,16 +833,23 @@ create policy admin_manage on profiles
   for all to authenticated
   using (is_admin()) with check (is_admin());
 
+-- 13.3 bis Périmètre : chacun lit le sien, seul l'admin l'attribue.
+create policy read_own on profile_sources
+  for select to authenticated using (profile_id = auth.uid() or is_admin());
+
+create policy admin_write on profile_sources
+  for all to authenticated using (is_admin()) with check (is_admin());
+
 -- 13.4 Contacts : création libre pour tout rôle actif ;
 --      modification si on en est propriétaire, ou si le contact est au pool.
 create policy insert_own on contacts
   for insert to authenticated
-  with check (est_actif() and (created_by = auth.uid() or is_admin()));
+  with check (est_actif() and (created_by = auth.uid() or is_admin()) and source_autorisee(source_id));
 
 create policy update_owned_or_pool on contacts
   for update to authenticated
-  using (est_actif() and (is_admin() or owner_id = auth.uid() or owner_id is null))
-  with check (est_actif() and (is_admin() or owner_id = auth.uid() or owner_id is null));
+  using (est_actif() and (is_admin() or owner_id = auth.uid() or owner_id is null) and source_autorisee(source_id))
+  with check (est_actif() and (is_admin() or owner_id = auth.uid() or owner_id is null) and source_autorisee(source_id));
 
 create policy admin_delete on contacts
   for delete to authenticated
@@ -817,19 +859,20 @@ create policy admin_delete on contacts
 --      le closer porte celles dont il est closer.
 create policy insert_opportunity on opportunities
   for insert to authenticated
-  with check (est_actif() and (is_admin() or setter_id = auth.uid() or closer_id = auth.uid() or setter_id is null));
+  with check (est_actif() and (is_admin() or setter_id = auth.uid() or closer_id = auth.uid() or setter_id is null)
+              and source_autorisee(source_id));
 
 create policy update_carried on opportunities
   for update to authenticated
   using (
-    est_actif() and (
+    est_actif() and source_autorisee(source_id) and (
       is_admin()
       or (current_role_name() = 'setter' and (setter_id = auth.uid() or setter_id is null))
       or (current_role_name() = 'closer' and closer_id = auth.uid())
     )
   )
   with check (
-    est_actif() and (
+    est_actif() and source_autorisee(source_id) and (
       is_admin()
       or (current_role_name() = 'setter' and (setter_id = auth.uid() or setter_id is null))
       or (current_role_name() = 'closer' and closer_id = auth.uid())

@@ -5,6 +5,7 @@ import { EnTetePage } from '@/components/ui'
 import { TableConfig } from '@/components/admin-tables'
 import { AdminUtilisateurs } from '@/components/admin-utilisateurs'
 import { AdminRelances } from '@/components/admin-relances'
+import type { Source } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,13 +15,20 @@ export default async function Admin() {
   if (profil.role !== 'admin') redirect('/')
 
   const supabase = await createClient()
-  const [etapes, sources, motifs, profils, regles] = await Promise.all([
+  const [etapes, sources, motifs, profils, regles, perimetresRes] = await Promise.all([
     supabase.from('pipeline_stages').select('*').order('position'),
     supabase.from('sources').select('*').order('position'),
     supabase.from('lost_reasons').select('*').order('position'),
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('relance_rules').select('*').order('position'),
+    supabase.from('profile_sources').select('profile_id, source_id'),
   ])
+
+  // profile_id → sources autorisées. Absent = aucune restriction.
+  const perimetres: Record<string, string[]> = {}
+  for (const ligne of perimetresRes.data ?? []) {
+    (perimetres[ligne.profile_id] ??= []).push(ligne.source_id)
+  }
 
   return (
     <div className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
@@ -60,6 +68,8 @@ export default async function Admin() {
           profils={profils.data ?? []}
           moi={profil.id}
           cleServicePresente={!!process.env.SUPABASE_SECRET_KEY}
+          sources={(sources.data ?? []) as Source[]}
+          perimetres={perimetres}
         />
       </div>
     </div>

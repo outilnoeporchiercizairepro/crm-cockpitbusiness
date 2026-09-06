@@ -4,11 +4,13 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   creerUtilisateur, definirMotDePasse, definirActif, majRole, supprimerUtilisateur,
+  definirSourcesProfil,
   type Resultat,
 } from '@/app/actions-admin'
 import { Carte, Badge, styleChamp, styleChampInline, styleBouton, styleBoutonDoux } from '@/components/ui'
+import { EtiquetteSource } from '@/components/etiquette-source'
 import { initiales } from '@/lib/format'
-import type { Profile, UserRole } from '@/lib/database.types'
+import type { Profile, Source, UserRole } from '@/lib/database.types'
 
 /** Mot de passe lisible et solide, pour ne pas en inventer un à la main. */
 function motDePasseSuggere() {
@@ -21,10 +23,15 @@ export function AdminUtilisateurs({
   profils,
   moi,
   cleServicePresente,
+  sources,
+  perimetres,
 }: {
   profils: Profile[]
   moi: string
   cleServicePresente: boolean
+  sources: Source[]
+  /** profile_id → sources autorisées. Absent ou vide = accès à tout. */
+  perimetres: Record<string, string[]>
 }) {
   const router = useRouter()
   const [, demarrer] = useTransition()
@@ -175,6 +182,14 @@ SUPABASE_SECRET_KEY=sb_secret_…
 
                 {!p.is_active && <Badge ton="alerte">Désactivé</Badge>}
 
+                {p.role !== 'admin' && (perimetres[p.id]?.length ? (
+                  <Badge ton="altitude">
+                    {perimetres[p.id].length} source{perimetres[p.id].length > 1 ? 's' : ''}
+                  </Badge>
+                ) : (
+                  <Badge>Toutes sources</Badge>
+                ))}
+
                 <select
                   value={p.role}
                   disabled={cestMoi}
@@ -223,6 +238,50 @@ SUPABASE_SECRET_KEY=sb_secret_…
                         Appliquer
                       </button>
                     </div>
+                  </div>
+
+                  <div className="border-t border-bordure pt-3">
+                    <p className="mb-1.5 text-xs text-texte-doux">Périmètre de visibilité</p>
+
+                    {p.role === 'admin' ? (
+                      <p className="text-xs text-texte-faible">
+                        Un compte admin voit toutes les sources : le périmètre ne s&apos;applique pas.
+                      </p>
+                    ) : (
+                      <>
+                        <div className="flex flex-wrap gap-1.5">
+                          {sources.map((src) => {
+                            const coche = perimetres[p.id]?.includes(src.id) ?? false
+                            return (
+                              <button
+                                key={src.id}
+                                onClick={() => {
+                                  const actuel = perimetres[p.id] ?? []
+                                  const suivant = coche
+                                    ? actuel.filter((x) => x !== src.id)
+                                    : [...actuel, src.id]
+                                  agir(() => definirSourcesProfil(p.id, suivant))
+                                }}
+                                aria-pressed={coche}
+                                className={`rounded-lg border px-2 py-1 transition ${
+                                  coche
+                                    ? 'border-altitude bg-altitude/10'
+                                    : 'border-bordure opacity-50 hover:opacity-100'
+                                }`}
+                              >
+                                <EtiquetteSource label={src.label} ton={src.color} />
+                              </button>
+                            )
+                          })}
+                        </div>
+
+                        <p className="mt-2 text-xs text-texte-faible">
+                          {perimetres[p.id]?.length
+                            ? "Ce compte ne voit que les contacts, affaires et RDV rattachés aux sources sélectionnées — y compris via l'API. Les affaires sans source lui restent invisibles."
+                            : 'Aucune source sélectionnée : ce compte voit tout. Coche au moins une source pour le restreindre.'}
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {!cestMoi && (

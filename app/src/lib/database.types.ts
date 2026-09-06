@@ -213,6 +213,12 @@ export type SaleRow = {
   cycle_days: number | null
 }
 
+export type ProfileSource = {
+  profile_id: string
+  source_id: string
+  created_at: string
+}
+
 export type ShowRateRow = {
   kind: AppointmentKind
   month: string
@@ -250,6 +256,7 @@ export type Database = {
       relance_rules: Table<RelanceRule, Partial<RelanceRule> & Pick<RelanceRule, 'label' | 'delai_jours'>>
       payments: Table<Payment, Partial<Payment> & Pick<Payment, 'opportunity_id' | 'due_date' | 'amount_expected'>>
       stage_transitions: Table<StageTransition, Partial<StageTransition> & Pick<StageTransition, 'opportunity_id' | 'to_stage_id'>>
+      profile_sources: Table<ProfileSource, Pick<ProfileSource, 'profile_id' | 'source_id'>>
     }
     Views: {
       v_funnel: Vue<FunnelRow>

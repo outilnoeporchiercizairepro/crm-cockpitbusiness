@@ -125,6 +125,46 @@ export async function definirActif(userId: string, actif: boolean): Promise<Resu
 
 /* ------------------------------------------------------------------ rôle */
 
+/**
+ * Définit le périmètre de sources d'un compte.
+ *
+ * Liste vide = aucune restriction, le compte voit tout. C'est la convention
+ * de la RLS : sans elle, la mise en place du périmètre aurait coupé l'accès
+ * de tous les comptes existants d'un coup.
+ *
+ * On remplace intégralement plutôt que d'ajouter/retirer ligne à ligne :
+ * l'écran envoie l'état complet des cases, et un diff se désynchroniserait
+ * dès que deux onglets sont ouverts.
+ */
+export async function definirSourcesProfil(
+  userId: string,
+  sourceIds: string[],
+): Promise<Resultat> {
+  await exigerAdmin()
+  const supabase = await createClient()
+
+  const { error: eSuppression } = await supabase
+    .from('profile_sources')
+    .delete()
+    .eq('profile_id', userId)
+  if (eSuppression) return { ok: false, erreur: eSuppression.message }
+
+  if (sourceIds.length) {
+    const { error } = await supabase
+      .from('profile_sources')
+      .insert(sourceIds.map((source_id) => ({ profile_id: userId, source_id })))
+    if (error) return { ok: false, erreur: error.message }
+  }
+
+  revalidatePath('/admin')
+  return {
+    ok: true,
+    message: sourceIds.length
+      ? `Périmètre limité à ${sourceIds.length} source${sourceIds.length > 1 ? 's' : ''}.`
+      : 'Périmètre retiré : ce compte voit toutes les sources.',
+  }
+}
+
 export async function majRole(userId: string, role: UserRole): Promise<Resultat> {
   try {
     const moi = await exigerAdmin()

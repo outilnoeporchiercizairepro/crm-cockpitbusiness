@@ -67,7 +67,21 @@ export async function creerContact(form: FormData): Promise<Resultat> {
     .select('id')
     .single()
 
-  if (error) return echec(error, 'Création impossible.')
+  if (error) {
+    // Un compte au périmètre restreint ne peut créer que dans ses sources —
+    // et pas sans source du tout, sinon la restriction se contourne en
+    // laissant le champ vide. Le message brut de la RLS ne le dirait pas.
+    const refusRls = error.message.includes('row-level security') || error.message.includes('42501')
+    if (refusRls) {
+      return {
+        ok: false,
+        erreur: source_id
+          ? "Ton compte n'a pas accès à cette source."
+          : 'Ton compte est limité à certaines sources : choisis-en une pour créer ce contact.',
+      }
+    }
+    return echec(error, 'Création impossible.')
+  }
 
   // Un contact sans opportunité n'entre pas dans l'entonnoir : on l'ouvre tout de suite.
   const etape = await premiereEtape(supabase)
@@ -206,15 +220,20 @@ export async function marquerPerdue(
   opportuniteId: string,
   motifId: string,
   note: string,
+  /**
+   * Étape perdue visée. Le kanban en a plusieurs — « Perdu » et « Mauvais
+   * ICP » — et sans ce paramètre, glisser une carte vers l'une atterrissait
+   * dans l'autre : la première étape perdue trouvée.
+   */
+  etapeId?: string,
 ): Promise<Resultat> {
   const supabase = await createClient()
 
-  const { data: etape } = await supabase
-    .from('pipeline_stages')
-    .select('id')
-    .eq('is_lost', true)
-    .limit(1)
-    .single()
+  if (!motifId) return { ok: false, erreur: 'Choisis un motif de perte.' }
+
+  const { data: etape } = etapeId
+    ? await supabase.from('pipeline_stages').select('id').eq('id', etapeId).eq('is_lost', true).maybeSingle()
+    : await supabase.from('pipeline_stages').select('id').eq('is_lost', true).order('position').limit(1).maybeSingle()
 
   if (!etape) return { ok: false, erreur: 'Aucune étape « perdue » configurée.' }
 

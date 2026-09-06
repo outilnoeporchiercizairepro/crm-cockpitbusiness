@@ -6,10 +6,10 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   useDraggable, useDroppable, type DragEndEvent, type DragStartEvent,
 } from '@dnd-kit/core'
-import { deplacerEtape } from '@/app/actions'
+import { deplacerEtape, marquerPerdue } from '@/app/actions'
 import { createClient } from '@/lib/supabase/client'
 import { euros, nomContact } from '@/lib/format'
-import { Badge, styleChamp, styleChampInline } from '@/components/ui'
+import { Badge, styleChamp, styleChampInline, styleBoutonDoux } from '@/components/ui'
 import { EtiquetteSource } from '@/components/etiquette-source'
 import { FOND_TON } from '@/lib/tons'
 import type { PipelineStage } from '@/lib/database.types'
@@ -22,6 +22,7 @@ export function Kanban({
   cartes,
   profils,
   sources,
+  motifs,
   filtreQui,
   filtreSource,
 }: {
@@ -29,6 +30,7 @@ export function Kanban({
   cartes: CarteOpportunite[]
   profils: { id: string; full_name: string }[]
   sources: { id: string; label: string }[]
+  motifs: { id: string; label: string }[]
   moi: string
   filtreQui: string
   filtreSource: string
@@ -37,6 +39,11 @@ export function Kanban({
   const [enTransition, demarrer] = useTransition()
   const [enDeplacement, setEnDeplacement] = useState<CarteOpportunite | null>(null)
   const [erreur, setErreur] = useState('')
+  // Carte déposée sur une colonne perdue, en attente de son motif.
+  const [perte, setPerte] = useState<
+    { carte: CarteOpportunite; etapeId: string; etapeLabel: string } | null
+  >(null)
+  const [note, setNote] = useState('')
 
   // Le pli des colonnes survit au rechargement : c'est un réglage d'espace de
   // travail, pas un état de session.
@@ -108,6 +115,16 @@ export function Kanban({
     if (!carte || carte.stage_id === versEtape) return
 
     setErreur('')
+
+    // Une étape perdue exige un motif : plutôt que de laisser partir un
+    // déplacement qui sera refusé, on demande le motif avant d'écrire. La
+    // carte ne bouge pas tant que la modale n'est pas validée.
+    const cible = etapes.find((et) => et.id === versEtape)
+    if (cible?.is_lost) {
+      setPerte({ carte, etapeId: versEtape, etapeLabel: cible.label })
+      return
+    }
+
     demarrer(async () => {
       deplacerLocal({ id: carte.id, versEtape })
       const r = await deplacerEtape(carte.id, versEtape)
@@ -184,6 +201,84 @@ export function Kanban({
           {enDeplacement && <Carte carte={enDeplacement} survol equipeMultiple={profils.length > 1} />}
         </DragOverlay>
       </DndContext>
+
+      {perte && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-fond/80 p-6"
+          onClick={() => { setPerte(null); setNote('') }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            className="apparait max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-bordure bg-surface p-5 shadow-2xl"
+          >
+            <h2 className="text-base font-semibold">
+              {nomContact(perte.carte.contact)} → {perte.etapeLabel}
+            </h2>
+            <p className="mt-2 text-sm text-texte-doux">
+              Un motif est nécessaire — c&apos;est lui qui rend les pertes analysables.
+            </p>
+
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {motifs.map((m) => (
+                <button
+                  key={m.id}
+                  disabled={enTransition}
+                  onClick={() =>
+                    demarrer(async () => {
+                      const r = await marquerPerdue(perte.carte.id, m.id, note, perte.etapeId)
+                      if (r.ok) {
+                        setPerte(null); setNote(''); setErreur(''); router.refresh()
+                      } else setErreur(r.erreur)
+                    })
+                  }
+                  className="rounded-lg border border-bordure px-3 py-1.5 text-sm text-texte-doux transition hover:border-danger hover:text-danger disabled:opacity-40"
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            {!motifs.length && (
+              <p className="mt-3 text-sm text-alerte">
+                Aucun motif de perte actif : ajoute-en un dans l&apos;administration.
+              </p>
+            )}
+
+            <div className="mt-4">
+              <label className="mb-1.5 block text-xs text-texte-doux">
+                Précision <span className="text-texte-faible">(facultatif)</span>
+              </label>
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                placeholder="Ce qui a bloqué"
+                className={styleChamp}
+              />
+              <p className="mt-1.5 text-xs text-texte-faible">
+                Écris la précision avant de choisir le motif : le clic sur un motif enregistre.
+              </p>
+            </div>
+
+            {erreur && (
+              <p className="apparait mt-3 rounded-lg border border-danger/30 bg-danger/8 px-3 py-2 text-sm text-danger">
+                {erreur}
+              </p>
+            )}
+
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => { setPerte(null); setNote(''); setErreur('') }}
+                className={styleBoutonDoux}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

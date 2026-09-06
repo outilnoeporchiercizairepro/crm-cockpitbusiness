@@ -1,5 +1,6 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { exigerIdentite } from '@/lib/session'
+import { exigerIdentite, profilCourant } from '@/lib/session'
 import { Carte, EnTetePage, Stat, TableauCompact, Vide } from '@/components/ui'
 import { FiltresDashboard } from '@/components/filtres-dashboard'
 import { BlocFinancier } from '@/components/bloc-financier'
@@ -23,6 +24,13 @@ export default async function Dashboard({
   const sp = await searchParams
   const periode = sp.periode && PERIODES[sp.periode] ? sp.periode : '90j'
   await exigerIdentite()
+
+  // Masquer le lien ne suffit pas : l'URL reste devinable. La RLS filtre
+  // déjà les lignes d'un compte restreint, mais les chiffres consolidés
+  // n'ont aucun sens pour un setter — autant fermer la page.
+  const profil = await profilCourant()
+  if (profil.role === 'setter') redirect('/contacts')
+
   const supabase = await createClient()
 
   const jours = PERIODES[periode].jours

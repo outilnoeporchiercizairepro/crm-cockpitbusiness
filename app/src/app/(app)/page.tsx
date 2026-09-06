@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite, profilCourant } from '@/lib/session'
 import { Carte, EnTetePage, Vide, Badge, LienOpportunite } from '@/components/ui'
@@ -14,6 +15,11 @@ export default async function MaJournee() {
   // requêtes peuvent donc partir immédiatement, profil compris.
   const moi = await exigerIdentite()
   const supabase = await createClient()
+
+  // Le setter n'a que Contacts et Pipeline : sans cette redirection, sa
+  // page d'arrivée après connexion serait un écran absent de son menu.
+  const profilArrivee = await profilCourant()
+  if (profilArrivee.role === 'setter') redirect('/contacts')
 
   const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0)
   const finJour = new Date(); finJour.setHours(23, 59, 59, 999)

@@ -31,7 +31,7 @@ export default async function Pipeline({
   const moi = await exigerIdentite()
   const supabase = await createClient()
 
-  const [etapesRes, oppsRes, profilsRes, sourcesRes] = await Promise.all([
+  const [etapesRes, oppsRes, profilsRes, sourcesRes, motifsRes] = await Promise.all([
     supabase.from('pipeline_stages').select('*').eq('is_active', true).order('position'),
     supabase
       .from('opportunities')
@@ -46,6 +46,7 @@ export default async function Pipeline({
       .order('created_at', { ascending: false }),
     supabase.from('profiles').select('id, full_name').eq('is_active', true).order('full_name'),
     supabase.from('sources').select('id, label, color').eq('is_active', true).order('position'),
+    supabase.from('lost_reasons').select('id, label').eq('is_active', true).order('position'),
   ])
 
   const etapes = (etapesRes.data ?? []) as PipelineStage[]
@@ -81,6 +82,7 @@ export default async function Pipeline({
         cartes={cartes}
         profils={profilsRes.data ?? []}
         sources={sourcesRes.data ?? []}
+        motifs={motifsRes.data ?? []}
         moi={moi.id}
         filtreQui={qui ?? ''}
         filtreSource={source ?? ''}

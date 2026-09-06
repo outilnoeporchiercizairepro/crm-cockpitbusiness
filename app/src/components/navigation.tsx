@@ -14,6 +14,19 @@ const LIENS = [
   { href: '/dashboard', label: 'Dashboard' },
 ]
 
+/**
+ * Un setter ne voit que ses contacts et le pipeline : les chiffres
+ * consolidés du dashboard ne le concernent pas.
+ *
+ * Ce filtrage n'est qu'un confort de lecture. Ce qui protège réellement,
+ * c'est la garde serveur de /dashboard et la RLS : masquer un lien
+ * n'empêche personne de taper l'URL.
+ */
+const LIENS_SETTER = [
+  { href: '/contacts', label: 'Contacts' },
+  { href: '/pipeline', label: 'Pipeline' },
+]
+
 const LIBELLE_ROLE: Record<string, string> = {
   admin: 'Admin',
   setter: 'Setter',
@@ -25,7 +38,10 @@ export function Navigation({ profil }: { profil: Profile }) {
   const router = useRouter()
   const [menu, setMenu] = useState(false)
 
-  const liens = profil.role === 'admin' ? [...LIENS, { href: '/admin', label: 'Admin' }] : LIENS
+  const liens =
+    profil.role === 'admin' ? [...LIENS, { href: '/admin', label: 'Admin' }]
+    : profil.role === 'setter' ? LIENS_SETTER
+    : LIENS
 
   async function deconnexion() {
     const supabase = createClient()
@@ -37,7 +53,7 @@ export function Navigation({ profil }: { profil: Profile }) {
   return (
     <header className="sticky top-0 z-40 border-b border-bordure bg-fond/85 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-1 px-4 sm:px-6">
-        <Link href="/" className="mr-4 flex shrink-0 items-center gap-2">
+        <Link href={profil.role === 'setter' ? '/contacts' : '/'} className="mr-4 flex shrink-0 items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-altitude/15 text-altitude">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <path d="m3 17 6-6 4 4 8-8" />

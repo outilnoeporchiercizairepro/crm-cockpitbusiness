@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { cloturerGagne } from '@/app/actions-closing'
 import { styleChamp, styleBoutonDoux } from '@/components/ui'
 import { NOMBRE_ECHEANCES, repartirEcheances } from '@/lib/echeances'
-import { euros } from '@/lib/format'
+import { euros, FUSEAU } from '@/lib/format'
 import type { PaymentPlan, LegalEntity } from '@/lib/database.types'
 
 /**
@@ -18,7 +18,7 @@ const TVA_PAR_DEFAUT: Record<LegalEntity, number> = { sasu: 20, auto: 0 }
 function moisSuivant(depart: Date, decalage: number) {
   const d = new Date(depart)
   d.setMonth(d.getMonth() + decalage)
-  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+  return d.toLocaleDateString('fr-FR', { timeZone: FUSEAU, day: 'numeric', month: 'short' })
 }
 
 export function ModaleClosing({

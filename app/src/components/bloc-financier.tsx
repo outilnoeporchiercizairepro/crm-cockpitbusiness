@@ -1,5 +1,5 @@
 import { Badge, Carte, LienOpportunite, Stat, TableauCompact } from '@/components/ui'
-import { euros, jour, jourIso, mois, pct, LIBELLE_PLAN } from '@/lib/format'
+import { euros, jour, jourIso, mois, moisIso, pct, LIBELLE_PLAN } from '@/lib/format'
 import type { Payment, PaymentPlan, SaleRow } from '@/lib/database.types'
 
 /**
@@ -91,7 +91,9 @@ export function BlocFinancier({
     if (p.status === 'annule' || p.status === 'rembourse') continue
     const attendu = Number(p.amount_expected)
     if (p.status === 'encaisse') {
-      const quand = (p.received_at?.slice(0, 7) ?? p.due_date.slice(0, 7))
+      // moisIso et non un slice de l'ISO : un règlement du 30 à 23 h
+      // tomberait sinon dans le mois précédent.
+      const quand = p.received_at ? moisIso(p.received_at) : p.due_date.slice(0, 7)
       casier(quand).encaisse += Number(p.amount_received ?? attendu)
     } else {
       const c = casier(p.due_date.slice(0, 7))

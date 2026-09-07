@@ -1,3 +1,14 @@
+/**
+ * Tout est daté et affiché à l'heure de Paris, explicitement.
+ *
+ * Les pages sont rendues côté serveur, dans un conteneur qui tourne en UTC :
+ * sans ce fuseau imposé, un RDV de 10 h 30 s'affichait 8 h 30. Le fixer ici
+ * plutôt que via la variable TZ du conteneur rend le rendu identique côté
+ * serveur et côté navigateur — donc insensible à la configuration de
+ * l'hébergeur, et sans écart d'hydratation.
+ */
+export const FUSEAU = 'Europe/Paris'
+
 const EUR = new Intl.NumberFormat('fr-FR', {
   style: 'currency',
   currency: 'EUR',
@@ -16,23 +27,64 @@ export function pct(num: number, denom: number) {
 
 export function jour(iso: string | null | undefined) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('fr-FR', {
+    timeZone: FUSEAU, day: '2-digit', month: 'short', year: 'numeric',
+  })
 }
 
 export function heure(iso: string | null | undefined) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  return new Date(iso).toLocaleTimeString('fr-FR', {
+    timeZone: FUSEAU, hour: '2-digit', minute: '2-digit',
+  })
 }
 
-/** « sept. 2025 » à partir d'une clé « 2025-09 » (mois calendaire, pas un instant). */
+/**
+ * « sept. 2025 » à partir d'une clé « 2025-09 ». Mois calendaire et non
+ * instant : construit et rendu en UTC, sinon le premier du mois pourrait
+ * basculer sur le mois précédent selon le fuseau du serveur.
+ */
 export function mois(cle: string) {
   const [annee, m] = cle.split('-').map(Number)
-  return new Date(annee, m - 1, 1).toLocaleDateString('fr-FR', { month: 'short', year: 'numeric' })
+  return new Date(Date.UTC(annee, m - 1, 1)).toLocaleDateString('fr-FR', {
+    timeZone: 'UTC', month: 'short', year: 'numeric',
+  })
 }
 
-/** Jour local au format « YYYY-MM-DD », comparable aux colonnes `date` de Postgres. */
-export function jourIso(d = new Date()) {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+/**
+ * Jour civil à Paris au format « YYYY-MM-DD », comparable aux colonnes `date`
+ * de Postgres. Passe par Intl et non par getDate() : ce dernier répondrait
+ * selon le fuseau du serveur, donc la veille entre minuit et 2 h.
+ */
+export function jourIso(d: Date | string = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSEAU, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(typeof d === 'string' ? new Date(d) : d)
+}
+
+/** Mois civil à Paris, « YYYY-MM ». */
+export function moisIso(d: Date | string = new Date()) {
+  return jourIso(d).slice(0, 7)
+}
+
+/** Décalage de Paris par rapport à UTC à cet instant, en millisecondes. */
+function decalageParis(instant: Date) {
+  const enUtc = new Date(instant.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const aParis = new Date(instant.toLocaleString('en-US', { timeZone: FUSEAU }))
+  return aParis.getTime() - enUtc.getTime()
+}
+
+/**
+ * Bornes du jour civil parisien contenant `d`.
+ *
+ * `setHours(0,0,0,0)` donnait minuit dans le fuseau du serveur : sur un
+ * conteneur en UTC, la journée affichée courait de 2 h du matin à 2 h du
+ * matin, ratant les RDV de fin de soirée et récupérant ceux de la veille.
+ */
+export function bornesDuJour(d = new Date()) {
+  const minuitUtc = new Date(`${jourIso(d)}T00:00:00Z`)
+  const debut = new Date(minuitUtc.getTime() - decalageParis(minuitUtc))
+  return { debut, fin: new Date(debut.getTime() + 86_400_000 - 1) }
 }
 
 export function jourHeure(iso: string | null | undefined) {
@@ -62,9 +114,7 @@ export function enRetard(iso: string | null | undefined) {
 
 export function estAujourdhui(iso: string | null | undefined) {
   if (!iso) return false
-  const d = new Date(iso)
-  const n = new Date()
-  return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
+  return jourIso(iso) === jourIso()
 }
 
 export function nomContact(c: { full_name: string } | null | undefined) {

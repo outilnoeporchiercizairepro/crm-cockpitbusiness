@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite } from '@/lib/session'
 import type { PaymentPlan, LegalEntity } from '@/lib/database.types'
 import { NOMBRE_ECHEANCES, repartirEcheances } from '@/lib/echeances'
+import { jourIso } from '@/lib/format'
 
 export type Resultat = { ok: true } | { ok: false; erreur: string }
 
@@ -109,7 +110,9 @@ export async function cloturerGagne(
     return {
       opportunity_id: opportuniteId,
       installment_no: i + 1,
-      due_date: echeance.toISOString().slice(0, 10),
+      // Jour civil à Paris : toISOString() donnait la veille pour tout
+      // closing enregistré après 22 h l'été.
+      due_date: jourIso(echeance),
       amount_expected: montant,
       status: 'attendu' as const,
       processor: PROCESSEUR[saisie.entite],

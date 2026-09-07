@@ -5,7 +5,7 @@ import { Carte, EnTetePage, Vide, Badge, LienOpportunite } from '@/components/ui
 import { IssueRdv } from '@/components/issue-rdv'
 import { EtiquetteSource } from '@/components/etiquette-source'
 import { ListeRelances, type Relance } from '@/components/liste-relances'
-import { heure, jourHeure, nomContact, relatif, enRetard, LIBELLE_RDV } from '@/lib/format'
+import { heure, jourHeure, nomContact, relatif, enRetard, bornesDuJour, FUSEAU, LIBELLE_RDV } from '@/lib/format'
 import type { TonSource } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
@@ -21,8 +21,7 @@ export default async function MaJournee() {
   const profilArrivee = await profilCourant()
   if (profilArrivee.role === 'setter') redirect('/contacts')
 
-  const debutJour = new Date(); debutJour.setHours(0, 0, 0, 0)
-  const finJour = new Date(); finJour.setHours(23, 59, 59, 999)
+  const { debut: debutJour, fin: finJour } = bornesDuJour()
 
   const [profil, rdvs, taches, nouveaux, motifs, premiereRegle] = await Promise.all([
     profilCourant(),
@@ -84,7 +83,7 @@ export default async function MaJournee() {
       <EnTetePage
         titre={`Bonjour ${prenom}`}
         sous={new Date().toLocaleDateString('fr-FR', {
-          weekday: 'long', day: 'numeric', month: 'long',
+          timeZone: FUSEAU, weekday: 'long', day: 'numeric', month: 'long',
         })}
       />
 

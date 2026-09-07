@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { profilCourant } from '@/lib/session'
-import { LIBELLE_ACTIVITE, LIBELLE_STATUT_RDV, euros } from '@/lib/format'
+import { LIBELLE_ACTIVITE, LIBELLE_STATUT_RDV, euros, FUSEAU } from '@/lib/format'
 
 export type ResultatIA =
   | { ok: true; message: string }
@@ -70,7 +70,7 @@ export async function genererRelanceWhatsApp(
   const motif = opp.lost_reasons as unknown as { label: string } | null
 
   const jour = (iso: string) =>
-    new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+    new Date(iso).toLocaleDateString('fr-FR', { timeZone: FUSEAU, day: 'numeric', month: 'long' })
 
   const joursDepuis = (iso: string | null | undefined) =>
     iso ? Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000) : null

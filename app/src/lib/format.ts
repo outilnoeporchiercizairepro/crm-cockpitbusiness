@@ -67,6 +67,30 @@ export function moisIso(d: Date | string = new Date()) {
   return jourIso(d).slice(0, 7)
 }
 
+/**
+ * Convertit une saisie `datetime-local` (« 2026-09-07T14:30 », sans fuseau)
+ * en instant ISO, en la lisant comme une heure de Paris.
+ *
+ * `new Date(saisie)` la lisait dans le fuseau de l'exécutant : côté serveur,
+ * en UTC, un RDV posé à 14 h 30 était enregistré à 16 h 30 heure de Paris.
+ */
+export function instantDepuisSaisieParis(saisie: string): string {
+  // Lue d'abord comme si elle était en UTC, puis ramenée du décalage parisien
+  // de ce moment-là — ce qui gère l'été comme l'hiver.
+  const approximation = new Date(`${saisie.length === 16 ? saisie : saisie.slice(0, 16)}:00Z`)
+  return new Date(approximation.getTime() - decalageParis(approximation)).toISOString()
+}
+
+/** Instant ISO → « 2026-09-07T14:30 », heure de Paris, pour un champ de saisie. */
+export function saisieDepuisInstant(iso: string): string {
+  const p = new Intl.DateTimeFormat('en-CA', {
+    timeZone: FUSEAU, year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(new Date(iso))
+  const v = (t: string) => p.find((x) => x.type === t)?.value ?? '00'
+  return `${v('year')}-${v('month')}-${v('day')}T${v('hour')}:${v('minute')}`
+}
+
 /** Décalage de Paris par rapport à UTC à cet instant, en millisecondes. */
 function decalageParis(instant: Date) {
   const enUtc = new Date(instant.toLocaleString('en-US', { timeZone: 'UTC' }))

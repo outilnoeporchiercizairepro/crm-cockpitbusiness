@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { loggerActivite, majStatutRdv } from '@/app/actions'
+import { DecalerRdv } from '@/components/decaler-rdv'
 import { Carte, Badge, styleChamp, styleBouton, styleBoutonDoux } from '@/components/ui'
 import {
   jourHeure, relatif, dureeJours,
@@ -27,10 +28,12 @@ export function Timeline({
   evenements,
   contactId,
   opportuniteId,
+  nomContact,
 }: {
   evenements: Evenement[]
   contactId: string
   opportuniteId: string
+  nomContact: string
 }) {
   const router = useRouter()
   const [, demarrer] = useTransition()
@@ -168,6 +171,12 @@ export function Timeline({
                             {s === 'honore' ? 'Honoré' : 'No-show'}
                           </button>
                         ))}
+                        <DecalerRdv
+                          rdvId={e.id}
+                          creneauActuel={e.quand}
+                          contact={nomContact}
+                          style="bouton"
+                        />
                       </div>
                     )}
                   </>

@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite, profilCourant } from '@/lib/session'
 import { normaliserCle } from '@/lib/codes'
+import { instantDepuisSaisieParis } from '@/lib/format'
 import type { ActivityType, ActivityDirection, AppointmentKind, AppointmentStatus, IcpStatus, PaymentPlan, PaymentProcessor, LegalEntity, TonSource } from '@/lib/database.types'
 
 export type Resultat = { ok: true } | { ok: false; erreur: string }
@@ -316,7 +317,7 @@ export async function creerRdv(form: FormData): Promise<Resultat> {
     opportunity_id: opportunityId,
     contact_id: String(form.get('contact_id')),
     kind: String(form.get('kind') ?? 'closing') as AppointmentKind,
-    scheduled_at: new Date(quand).toISOString(),
+    scheduled_at: instantDepuisSaisieParis(quand),
     duration_min: Number(form.get('duration_min') ?? 45),
     host_id: String(form.get('host_id') ?? '') || profil.id,
     location: String(form.get('location') ?? '').trim() || null,
@@ -326,6 +327,81 @@ export async function creerRdv(form: FormData): Promise<Resultat> {
   revalidatePath(`/opportunites/${opportunityId}`)
   revalidatePath('/')
   return echec(error, 'Création du RDV impossible.')
+}
+
+/**
+ * Décale un rendez-vous : l'ancien créneau est marqué « replanifié » et
+ * pointe vers le nouveau, qui reprend son type, sa durée, son hôte et son
+ * lieu.
+ *
+ * Deux lignes plutôt qu'un simple changement de date : le no-show et le
+ * report ne se ressemblent pas, et l'historique doit montrer qu'un client a
+ * fait glisser son créneau — c'est un signal commercial. Les colonnes
+ * `rescheduled_to` et le statut « replanifie » étaient prévus pour ça depuis
+ * le début du schéma.
+ */
+export async function replanifierRdv(
+  rdvId: string,
+  nouvelleDate: string,
+  motif?: string,
+): Promise<Resultat> {
+  const profil = await exigerIdentite()
+  const supabase = await createClient()
+
+  if (!nouvelleDate) return { ok: false, erreur: 'Indique le nouveau créneau.' }
+
+  const { data: ancien } = await supabase
+    .from('appointments')
+    .select('id, opportunity_id, contact_id, kind, duration_min, host_id, location, status, scheduled_at')
+    .eq('id', rdvId)
+    .maybeSingle()
+
+  if (!ancien) return { ok: false, erreur: 'Rendez-vous introuvable.' }
+  if (ancien.status !== 'planifie') {
+    return { ok: false, erreur: 'Seul un rendez-vous encore planifié peut être décalé.' }
+  }
+
+  const quand = instantDepuisSaisieParis(nouvelleDate)
+  if (quand === ancien.scheduled_at) {
+    return { ok: false, erreur: "C'est déjà le créneau actuel." }
+  }
+
+  const { data: nouveau, error: eCreation } = await supabase
+    .from('appointments')
+    .insert({
+      opportunity_id: ancien.opportunity_id,
+      contact_id: ancien.contact_id,
+      kind: ancien.kind,
+      scheduled_at: quand,
+      duration_min: ancien.duration_min,
+      host_id: ancien.host_id,
+      location: ancien.location,
+      notes: motif?.trim() || null,
+      created_by: profil.id,
+    })
+    .select('id')
+    .single()
+
+  if (eCreation) return echec(eCreation, 'Impossible de créer le nouveau créneau.')
+
+  // L'ancien n'est fermé qu'une fois le nouveau créé : si l'insertion échoue,
+  // on garde un rendez-vous valide plutôt que d'en perdre un.
+  const { error: eAncien } = await supabase
+    .from('appointments')
+    .update({ status: 'replanifie', rescheduled_to: nouveau.id })
+    .eq('id', rdvId)
+
+  if (eAncien) {
+    return {
+      ok: false,
+      erreur: `Nouveau créneau créé, mais l'ancien est resté planifié : ${eAncien.message}`,
+    }
+  }
+
+  revalidatePath(`/opportunites/${ancien.opportunity_id}`)
+  revalidatePath('/')
+  revalidatePath('/pipeline')
+  return { ok: true }
 }
 
 export async function majStatutRdv(
@@ -357,7 +433,7 @@ export async function creerTache(form: FormData): Promise<Resultat> {
     contact_id: String(form.get('contact_id') ?? '') || null,
     title: String(form.get('title') ?? '').trim() || 'Relancer',
     details: String(form.get('details') ?? '').trim() || null,
-    due_at: new Date(quand).toISOString(),
+    due_at: instantDepuisSaisieParis(quand),
     assignee_id: String(form.get('assignee_id') ?? '') || profil.id,
     created_by: profil.id,
   })

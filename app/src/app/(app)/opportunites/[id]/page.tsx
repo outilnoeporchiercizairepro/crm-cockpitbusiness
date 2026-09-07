@@ -167,6 +167,7 @@ export default async function FicheOpportunite({
           evenements={evenements}
           contactId={contact.id}
           opportuniteId={id}
+          nomContact={nomContact(contact)}
         />
 
         <div className="space-y-4">

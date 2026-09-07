@@ -128,6 +128,7 @@ export default async function MaJournee() {
                     contact={nomContact(c)}
                     motifs={motifs.data ?? []}
                     delaiPremiereRelance={premiereRegle.data?.delai_jours ?? 2}
+                    creneau={r.scheduled_at}
                   />
                 </div>
               )

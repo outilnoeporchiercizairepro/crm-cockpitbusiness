@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite } from '@/lib/session'
 import type { PaymentPlan, LegalEntity } from '@/lib/database.types'
 import { NOMBRE_ECHEANCES, repartirEcheances } from '@/lib/echeances'
-import { jourIso } from '@/lib/format'
+import { jourIso, instantDepuisSaisieParis } from '@/lib/format'
 
 export type Resultat = { ok: true } | { ok: false; erreur: string }
 
@@ -197,7 +197,7 @@ export async function cloturerEnAttente(
     contact_id: contactId,
     title: relance.motif.trim(),
     details: relance.contenu.trim() || null,
-    due_at: new Date(relance.quand).toISOString(),
+    due_at: instantDepuisSaisieParis(relance.quand),
     assignee_id: profil.id,
     created_by: profil.id,
   })

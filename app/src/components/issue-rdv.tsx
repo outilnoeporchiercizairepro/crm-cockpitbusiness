@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { cloturerPerdu, cloturerEnAttente, marquerNoShow } from '@/app/actions-closing'
 import { ModaleClosing } from '@/components/modale-closing'
+import { DecalerRdv } from '@/components/decaler-rdv'
 import { styleChamp, styleBouton, styleBoutonDoux } from '@/components/ui'
 
 type Issue = 'aucune' | 'close' | 'perdu' | 'attente'
@@ -22,6 +23,7 @@ export function IssueRdv({
   contact,
   motifs,
   delaiPremiereRelance,
+  creneau,
 }: {
   rdvId: string
   opportuniteId: string
@@ -29,6 +31,8 @@ export function IssueRdv({
   contact: string
   motifs: { id: string; label: string }[]
   delaiPremiereRelance: number
+  /** Créneau actuel, pour préremplir le report. */
+  creneau: string
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -85,6 +89,7 @@ export function IssueRdv({
         >
           No-show
         </button>
+        <DecalerRdv rdvId={rdvId} creneauActuel={creneau} contact={contact} />
       </div>
 
       {issue === 'close' && (

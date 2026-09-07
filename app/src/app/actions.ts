@@ -466,6 +466,25 @@ export async function rouvrirTache(id: string): Promise<Resultat> {
   return echec(error, 'Impossible de rouvrir la relance.')
 }
 
+/* ------------------------------------------------------------ notifications */
+
+/**
+ * Horodate l'ouverture de la cloche. Le compteur de non-lues se déduit de
+ * cette date : une table de lectures par utilisateur et par notification
+ * coûterait bien plus que ce qu'elle apporterait pour un simple badge.
+ */
+export async function marquerNotificationsVues(): Promise<Resultat> {
+  const profil = await exigerIdentite()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ notifications_vues_le: new Date().toISOString() })
+    .eq('id', profil.id)
+
+  return echec(error, 'Impossible de marquer les notifications comme lues.')
+}
+
 /* -------------------------------------------------------------------- admin */
 
 function echecConfig(e: { message: string } | null, defaut: string): Resultat {

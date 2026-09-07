@@ -5,7 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { initiales } from '@/lib/format'
-import type { Profile } from '@/lib/database.types'
+import { ClocheNotifications } from '@/components/cloche-notifications'
+import type { Profile, Notification as NotificationRow } from '@/lib/database.types'
 
 const LIENS = [
   { href: '/', label: 'Ma journée' },
@@ -33,7 +34,13 @@ const LIBELLE_ROLE: Record<string, string> = {
   closer: 'Closer',
 }
 
-export function Navigation({ profil }: { profil: Profile }) {
+export function Navigation({
+  profil,
+  notifications,
+}: {
+  profil: Profile
+  notifications: NotificationRow[]
+}) {
   const pathname = usePathname()
   const router = useRouter()
   const [menu, setMenu] = useState(false)
@@ -81,6 +88,11 @@ export function Navigation({ profil }: { profil: Profile }) {
             )
           })}
         </nav>
+
+        <ClocheNotifications
+          initiales={notifications}
+          vuesLe={profil.notifications_vues_le}
+        />
 
         <div className="relative shrink-0">
           <button

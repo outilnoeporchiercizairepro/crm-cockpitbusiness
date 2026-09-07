@@ -21,6 +21,8 @@ export type Profile = {
   email: string
   role: UserRole
   is_active: boolean
+  /** Dernière ouverture de la cloche. Null = jamais consultée. */
+  notifications_vues_le: string | null
   created_at: string
   updated_at: string
 }
@@ -213,6 +215,21 @@ export type SaleRow = {
   cycle_days: number | null
 }
 
+export type GenreNotification = 'etape' | 'rdv_decale' | 'rdv_pris'
+
+export type Notification = {
+  id: string
+  genre: GenreNotification
+  opportunity_id: string | null
+  contact_id: string | null
+  appointment_id: string | null
+  source_id: string | null
+  titre: string
+  detail: string | null
+  acteur_nom: string
+  created_at: string
+}
+
 export type ProfileSource = {
   profile_id: string
   source_id: string
@@ -257,6 +274,7 @@ export type Database = {
       payments: Table<Payment, Partial<Payment> & Pick<Payment, 'opportunity_id' | 'due_date' | 'amount_expected'>>
       stage_transitions: Table<StageTransition, Partial<StageTransition> & Pick<StageTransition, 'opportunity_id' | 'to_stage_id'>>
       profile_sources: Table<ProfileSource, Pick<ProfileSource, 'profile_id' | 'source_id'>>
+      notifications: Table<Notification, Partial<Notification>>
     }
     Views: {
       v_funnel: Vue<FunnelRow>

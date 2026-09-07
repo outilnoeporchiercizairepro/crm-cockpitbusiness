@@ -56,40 +56,53 @@ export function IssueRdv({
   }
 
   if (fait) {
-    const ton = fait === 'Closé' ? 'text-succes' : fait === 'Perdu' ? 'text-danger' : 'text-texte-doux'
-    return <span className={`shrink-0 text-xs font-medium ${ton}`}>{fait}</span>
+    const ton =
+      fait === 'Closé' ? 'border-succes/40 bg-succes/10 text-succes'
+      : fait === 'Perdu' ? 'border-danger/40 bg-danger/10 text-danger'
+      : 'border-bordure bg-surface-2 text-texte-doux'
+    return (
+      <span className={`inline-flex items-center rounded-lg border px-3 py-2 text-sm font-medium ${ton}`}>
+        {fait}
+      </span>
+    )
   }
 
   return (
     <>
-      <div className="flex shrink-0 flex-wrap items-center gap-1">
+      {/* Les trois issues d'un closing d'abord, à taille égale : c'est le
+          geste qu'on fait en sortant d'un appel, il ne doit pas se chercher.
+          No-show et report ensuite, plus discrets : ils sont plus rares. */}
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => { setIssue('close'); setErreur('') }}
-          className="rounded border border-bordure px-2 py-0.5 text-xs text-texte-doux transition hover:border-succes hover:text-succes"
+          className="min-w-28 flex-1 rounded-lg border border-succes/40 bg-succes/8 px-4 py-2.5 text-sm font-medium text-succes transition hover:bg-succes/16"
         >
           Closé
         </button>
         <button
-          onClick={() => { setIssue('perdu'); setErreur('') }}
-          className="rounded border border-bordure px-2 py-0.5 text-xs text-texte-doux transition hover:border-danger hover:text-danger"
-        >
-          Perdu
-        </button>
-        <button
           onClick={() => { setIssue('attente'); setErreur('') }}
-          className="rounded border border-bordure px-2 py-0.5 text-xs text-texte-doux transition hover:border-altitude hover:text-altitude"
+          className="min-w-28 flex-1 rounded-lg border border-altitude/40 bg-altitude/8 px-4 py-2.5 text-sm font-medium text-altitude transition hover:bg-altitude/16"
         >
           En attente
         </button>
         <button
-          onClick={() => agir(() => marquerNoShow(rdvId, opportuniteId), 'No-show')}
-          disabled={enCours}
-          title="Le prospect ne s'est pas présenté"
-          className="rounded px-1.5 py-0.5 text-xs text-texte-faible transition hover:text-danger disabled:opacity-40"
+          onClick={() => { setIssue('perdu'); setErreur('') }}
+          className="min-w-28 flex-1 rounded-lg border border-danger/40 bg-danger/8 px-4 py-2.5 text-sm font-medium text-danger transition hover:bg-danger/16"
         >
-          No-show
+          Perdu
         </button>
-        <DecalerRdv rdvId={rdvId} creneauActuel={creneau} contact={contact} />
+
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <button
+            onClick={() => agir(() => marquerNoShow(rdvId, opportuniteId), 'No-show')}
+            disabled={enCours}
+            title="Le prospect ne s'est pas présenté"
+            className="flex-1 rounded-lg border border-bordure px-3 py-2.5 text-sm text-texte-doux transition hover:border-danger/50 hover:text-danger disabled:opacity-40 sm:flex-none"
+          >
+            No-show
+          </button>
+          <DecalerRdv rdvId={rdvId} creneauActuel={creneau} contact={contact} style="grand" />
+        </div>
       </div>
 
       {issue === 'close' && (

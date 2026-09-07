@@ -59,40 +59,55 @@ export function ListeRelances({ relances }: { relances: Relance[] }) {
     <>
       <div className="divide-y divide-bordure">
         {restantes.map((r) => (
-          <div key={r.id} className="flex items-start gap-3 px-4 py-3">
+          <div key={r.id} className="flex items-start gap-4 px-5 py-5">
+            {/* Cible de clic large : c'est le geste le plus répété de la
+                journée, une case de 16 px se rate une fois sur trois. */}
             <button
               onClick={() => cocher(r)}
               title="Marquer comme faite"
               aria-label={`Marquer « ${r.titre} » comme faite`}
-              className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-bordure-forte transition hover:border-succes hover:bg-succes/10"
-            />
+              className="group mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border-2 border-bordure-forte transition hover:border-succes hover:bg-succes/10"
+            >
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"
+                className="text-succes opacity-0 transition group-hover:opacity-100"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </button>
 
             <div className="min-w-0 flex-1">
               {r.opportuniteId ? (
                 <Link
                   href={`/opportunites/${r.opportuniteId}`}
                   prefetch={false}
-                  className="block truncate text-sm transition hover:text-altitude"
+                  className="block text-lg font-medium tracking-tight transition hover:text-altitude"
                 >
                   {r.titre}
                 </Link>
               ) : (
-                <p className="truncate text-sm">{r.titre}</p>
+                <p className="text-lg font-medium tracking-tight">{r.titre}</p>
               )}
-              <p className="mt-0.5 truncate text-xs text-texte-faible">
+              <p className="mt-1 text-sm text-texte-doux">
                 {[r.contact, r.entreprise].filter(Boolean).join(' · ') || '—'}
               </p>
             </div>
 
-            <Badge ton={enRetard(r.echeance) ? 'danger' : 'neutre'}>
+            <Badge
+              ton={enRetard(r.echeance) ? 'danger' : 'neutre'}
+              className="mt-1 shrink-0 px-2.5 py-1 text-sm"
+            >
               <span suppressHydrationWarning>{relatif(r.echeance)}</span>
             </Badge>
           </div>
         ))}
 
         {!restantes.length && (
-          <p className="px-4 py-8 text-center text-sm text-texte-faible">
-            Toutes les relances du jour sont traitées.
+          <p className="px-6 py-12 text-center text-base text-texte-faible">
+            {relances.length
+              ? 'Toutes les relances du jour sont traitées.'
+              : 'Aucune relance due aujourd\u2019hui.'}
           </p>
         )}
       </div>
@@ -104,13 +119,13 @@ export function ListeRelances({ relances }: { relances: Relance[] }) {
       )}
 
       {derniereFaite && (
-        <div className="apparait flex items-center justify-between gap-3 border-t border-bordure bg-succes/8 px-4 py-2.5">
+        <div className="apparait flex items-center justify-between gap-3 border-t border-bordure bg-succes/8 px-5 py-3">
           <p className="min-w-0 truncate text-sm text-succes">
             « {derniereFaite.titre} » marquée faite
           </p>
           <button
             onClick={() => annuler(derniereFaite)}
-            className="shrink-0 text-sm text-texte-doux underline-offset-2 transition hover:text-texte hover:underline"
+            className="shrink-0 rounded-lg border border-bordure px-3 py-1.5 text-sm text-texte-doux transition hover:border-bordure-forte hover:text-texte"
           >
             Annuler
           </button>

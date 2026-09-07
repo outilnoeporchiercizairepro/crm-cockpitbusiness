@@ -22,7 +22,7 @@ export function DecalerRdv({
   rdvId: string
   creneauActuel: string
   contact: string
-  style?: 'discret' | 'bouton'
+  style?: 'discret' | 'bouton' | 'grand'
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -43,9 +43,11 @@ export function DecalerRdv({
         }}
         title="Le client demande un autre créneau"
         className={
-          style === 'bouton'
-            ? 'rounded border border-bordure px-2 py-0.5 text-xs text-texte-doux transition hover:border-altitude hover:text-altitude'
-            : 'rounded px-1.5 py-0.5 text-xs text-texte-faible transition hover:text-altitude'
+          style === 'grand'
+            ? 'flex-1 rounded-lg border border-bordure px-3 py-2.5 text-sm text-texte-doux transition hover:border-altitude/50 hover:text-altitude sm:flex-none'
+            : style === 'bouton'
+              ? 'rounded border border-bordure px-2 py-0.5 text-xs text-texte-doux transition hover:border-altitude hover:text-altitude'
+              : 'rounded px-1.5 py-0.5 text-xs text-texte-faible transition hover:text-altitude'
         }
       >
         Décaler

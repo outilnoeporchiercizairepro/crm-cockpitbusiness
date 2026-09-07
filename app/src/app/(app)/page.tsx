@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { exigerIdentite, profilCourant } from '@/lib/session'
-import { Carte, EnTetePage, Vide, Badge, LienOpportunite } from '@/components/ui'
+import { Carte, EnTetePage, LienOpportunite } from '@/components/ui'
 import { IssueRdv } from '@/components/issue-rdv'
 import { EtiquetteSource } from '@/components/etiquette-source'
 import { ListeRelances, type Relance } from '@/components/liste-relances'
-import { heure, jourHeure, nomContact, relatif, enRetard, bornesDuJour, FUSEAU, LIBELLE_RDV } from '@/lib/format'
+import { heure, nomContact, relatif, bornesDuJour, FUSEAU, LIBELLE_RDV } from '@/lib/format'
 import type { TonSource } from '@/lib/database.types'
 
 export const dynamic = 'force-dynamic'
@@ -76,10 +76,10 @@ export default async function MaJournee() {
   }).sort((a, b) => a.echeance.localeCompare(b.echeance))
 
   const prenom = profil.full_name.split(' ')[0]
-  const rien = !(rdvs.data ?? []).length && !relances.length && !aContacter.length
+  const rdvsDuJour = rdvs.data ?? []
 
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+    <div className="mx-auto max-w-[1700px] px-4 py-8 sm:px-8">
       <EnTetePage
         titre={`Bonjour ${prenom}`}
         sous={new Date().toLocaleDateString('fr-FR', {
@@ -87,103 +87,113 @@ export default async function MaJournee() {
         })}
       />
 
-      {rien && (
-        <Vide
-          titre="Rien à traiter aujourd'hui"
-          sous="Aucun RDV, aucune relance due, aucun lead en attente de premier contact. Le pipeline est à jour."
-        />
-      )}
-
-      <div className="grid gap-5 lg:grid-cols-2">
+      {/* Deux colonnes égales : la journée se lit d'un côté, se traite de
+          l'autre. Chacune garde sa place même vide — une colonne qui
+          disparaît fait sauter la mise en page d'un jour à l'autre. */}
+      <div className="grid items-start gap-6 xl:grid-cols-2">
         {/* ------------------------------------------------------- RDV du jour */}
-        {!!(rdvs.data ?? []).length && (
-          <Section titre="RDV du jour" compte={rdvs.data!.length}>
-            {rdvs.data!.map((r) => {
-              const c = r.contacts as unknown as {
-                full_name: string; company: string | null; phone: string | null
-                sources: { label: string; color: TonSource } | null
-              } | null
-              return (
-                <div key={r.id} className="flex items-start gap-3 px-4 py-3">
-                  <div className="w-12 shrink-0 pt-0.5 text-sm font-medium tabular-nums text-altitude">
-                    {heure(r.scheduled_at)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <LienOpportunite id={r.opportunity_id} className="min-w-0 truncate text-sm font-medium">
+        <Colonne titre="RDV du jour" compte={rdvsDuJour.length}>
+          {!rdvsDuJour.length ? (
+            <p className="px-6 py-12 text-center text-base text-texte-faible">
+              Aucun rendez-vous aujourd&apos;hui.
+            </p>
+          ) : (
+            <div className="divide-y divide-bordure">
+              {rdvsDuJour.map((r) => {
+                const c = r.contacts as unknown as {
+                  full_name: string; company: string | null; phone: string | null
+                  sources: { label: string; color: TonSource } | null
+                } | null
+                return (
+                  <div key={r.id} className="px-5 py-5">
+                    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+                      <span className="text-3xl font-semibold tabular-nums tracking-tight text-altitude">
+                        {heure(r.scheduled_at)}
+                      </span>
+                      <LienOpportunite
+                        id={r.opportunity_id}
+                        className="min-w-0 text-xl font-semibold tracking-tight"
+                      >
                         {nomContact(c)}
                       </LienOpportunite>
                       <EtiquetteSource label={c?.sources?.label} ton={c?.sources?.color} />
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-texte-faible">
+
+                    <p className="mt-1.5 text-sm text-texte-doux">
                       {LIBELLE_RDV[r.kind]}
                       {c?.company ? ` · ${c.company}` : ''}
-                      {c?.phone ? ` · ${c.phone}` : ''}
+                      {c?.phone && (
+                        <>
+                          {' · '}
+                          <a href={`tel:${c.phone}`} className="text-altitude hover:underline">
+                            {c.phone}
+                          </a>
+                        </>
+                      )}
                     </p>
+
+                    <div className="mt-4">
+                      <IssueRdv
+                        rdvId={r.id}
+                        opportuniteId={r.opportunity_id}
+                        contactId={r.contact_id}
+                        contact={nomContact(c)}
+                        motifs={motifs.data ?? []}
+                        delaiPremiereRelance={premiereRegle.data?.delai_jours ?? 2}
+                        creneau={r.scheduled_at}
+                      />
+                    </div>
                   </div>
-                  <IssueRdv
-                    rdvId={r.id}
-                    opportuniteId={r.opportunity_id}
-                    contactId={r.contact_id}
-                    contact={nomContact(c)}
-                    motifs={motifs.data ?? []}
-                    delaiPremiereRelance={premiereRegle.data?.delai_jours ?? 2}
-                    creneau={r.scheduled_at}
-                  />
-                </div>
-              )
-            })}
-          </Section>
-        )}
+                )
+              })}
+            </div>
+          )}
+        </Colonne>
 
         {/* -------------------------------------------------------- relances */}
-        {!!relances.length && (
-          <Carte className="overflow-hidden">
-            <div className="flex items-center justify-between border-b border-bordure px-4 py-3">
-              <h2 className="text-sm font-medium">Relances dues</h2>
-              <span className="text-xs tabular-nums text-texte-faible">{relances.length}</span>
-            </div>
-            <ListeRelances relances={relances} />
-          </Carte>
-        )}
+        <Colonne titre="Relances dues" compte={relances.length}>
+          <ListeRelances relances={relances} />
+        </Colonne>
+      </div>
 
-        {/* ------------------------------------------------ leads à contacter */}
-        {!!aContacter.length && (
-          <Section titre="Leads à contacter" compte={aContacter.length}>
-            {aContacter.slice(0, 12).map((o) => {
-              const c = o.contacts as unknown as {
-                full_name: string; company: string | null
-                sources: { label: string; color: TonSource } | null
-              } | null
-              return (
-                <div key={o.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <LienOpportunite id={o.id} className="min-w-0 truncate text-sm font-medium">
+      {/* ------------------------------------------------ leads à contacter */}
+      {!!aContacter.length && (
+        <div className="mt-6">
+          <Colonne titre="Leads à contacter" compte={aContacter.length}>
+            <div className="grid gap-px bg-bordure sm:grid-cols-2 xl:grid-cols-3">
+              {aContacter.slice(0, 12).map((o) => {
+                const c = o.contacts as unknown as {
+                  full_name: string; company: string | null
+                  sources: { label: string; color: TonSource } | null
+                } | null
+                return (
+                  <div key={o.id} className="bg-surface px-5 py-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <LienOpportunite id={o.id} className="min-w-0 text-base font-medium">
                         {nomContact(c)}
                       </LienOpportunite>
                       <EtiquetteSource label={c?.sources?.label} ton={c?.sources?.color} />
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-texte-faible">
+                    <p className="mt-1 truncate text-sm text-texte-faible">
                       {c?.company ?? 'Entreprise inconnue'} · créé {relatif(o.created_at)}
                     </p>
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
+            </div>
             {aContacter.length > 12 && (
-              <p className="px-4 py-2.5 text-xs text-texte-faible">
+              <p className="px-5 py-3 text-sm text-texte-faible">
                 et {aContacter.length - 12} autres — voir le pipeline
               </p>
             )}
-          </Section>
-        )}
-      </div>
+          </Colonne>
+        </div>
+      )}
     </div>
   )
 }
 
-function Section({
+function Colonne({
   titre,
   compte,
   children,
@@ -194,11 +204,13 @@ function Section({
 }) {
   return (
     <Carte className="overflow-hidden">
-      <div className="flex items-center justify-between border-b border-bordure px-4 py-3">
-        <h2 className="text-sm font-medium">{titre}</h2>
-        <span className="text-xs tabular-nums text-texte-faible">{compte}</span>
+      <div className="flex items-center justify-between border-b border-bordure px-5 py-4">
+        <h2 className="text-base font-semibold tracking-tight">{titre}</h2>
+        <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-sm font-medium tabular-nums text-texte-doux">
+          {compte}
+        </span>
       </div>
-      <div className="divide-y divide-bordure">{children}</div>
+      {children}
     </Carte>
   )
 }

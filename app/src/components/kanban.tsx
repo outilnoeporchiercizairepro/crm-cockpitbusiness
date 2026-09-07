@@ -25,6 +25,7 @@ export function Kanban({
   motifs,
   filtreQui,
   filtreSource,
+  lectureSeule = false,
 }: {
   etapes: PipelineStage[]
   cartes: CarteOpportunite[]
@@ -34,6 +35,8 @@ export function Kanban({
   moi: string
   filtreQui: string
   filtreSource: string
+  /** Un setter consulte le pipeline sans pouvoir déplacer une carte. */
+  lectureSeule?: boolean
 }) {
   const router = useRouter()
   const [enTransition, demarrer] = useTransition()
@@ -103,11 +106,13 @@ export function Kanban({
   )
 
   function debut(e: DragStartEvent) {
+    if (lectureSeule) return
     setEnDeplacement(vue.find((c) => c.id === e.active.id) ?? null)
   }
 
   function fin(e: DragEndEvent) {
     setEnDeplacement(null)
+    if (lectureSeule) return
     const versEtape = e.over?.id as string | undefined
     if (!versEtape) return
 
@@ -191,6 +196,7 @@ export function Kanban({
               etape={etape}
               cartes={vue.filter((c) => c.stage_id === etape.id)}
               equipeMultiple={profils.length > 1}
+              figee={lectureSeule}
               repliee={pliChargé && repliees.has(etape.key)}
               onBasculer={() => basculerPli(etape.key)}
             />
@@ -289,12 +295,14 @@ function Colonne({
   equipeMultiple,
   repliee,
   onBasculer,
+  figee = false,
 }: {
   etape: PipelineStage
   cartes: CarteOpportunite[]
   equipeMultiple: boolean
   repliee: boolean
   onBasculer: () => void
+  figee?: boolean
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: etape.id })
 
@@ -365,7 +373,7 @@ function Colonne({
         }`}
       >
         {cartes.map((c) => (
-          <Carte key={c.id} carte={c} equipeMultiple={equipeMultiple} />
+          <Carte key={c.id} carte={c} equipeMultiple={equipeMultiple} figee={figee} />
         ))}
         {!cartes.length && (
           <p className="px-2 py-6 text-center text-xs text-texte-faible">Vide</p>
@@ -379,10 +387,12 @@ function Carte({
   carte,
   survol = false,
   equipeMultiple = false,
+  figee = false,
 }: {
   carte: CarteOpportunite
   survol?: boolean
   equipeMultiple?: boolean
+  figee?: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: carte.id,
@@ -397,7 +407,9 @@ function Carte({
       {...listeners}
       {...attributes}
       style={transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined}
-      className={`cursor-grab touch-none rounded-lg border bg-surface p-2.5 transition active:cursor-grabbing ${
+      className={`touch-none rounded-lg border bg-surface p-2.5 transition ${
+        figee ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'
+      } ${
         survol ? 'rotate-1 border-altitude/60 shadow-2xl' : 'border-bordure hover:border-bordure-forte'
       } ${isDragging && !survol ? 'opacity-30' : ''}`}
     >

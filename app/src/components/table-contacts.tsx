@@ -43,10 +43,13 @@ export function TableContacts({
   lignes,
   sources,
   estAdmin,
+  lectureSeule = false,
 }: {
   lignes: LigneContact[]
   sources: { id: string; label: string; color: TonSource }[]
   estAdmin: boolean
+  /** Un setter consulte : il ne crée ni n'importe de contact. */
+  lectureSeule?: boolean
 }) {
   const router = useRouter()
   const [enCours, demarrer] = useTransition()
@@ -100,6 +103,7 @@ export function TableContacts({
             : `${lignes.length} contact${lignes.length > 1 ? 's' : ''}${caFiltre ? ` · ${euros(caFiltre)} signés` : ''}`
         }
         action={
+          lectureSeule ? undefined : (
           <div className="flex gap-2">
             <button
               onClick={() => setPanneau(panneau === 'import' ? 'aucun' : 'import')}
@@ -114,6 +118,7 @@ export function TableContacts({
               Nouveau contact
             </button>
           </div>
+          )
         }
       />
 
@@ -281,7 +286,7 @@ export function TableContacts({
                     <td className="whitespace-nowrap px-2 py-2.5 text-right">
                       <div className="flex items-center justify-end gap-0.5">
                         {/* Closable seulement tant que l'affaire est ouverte. */}
-                        {l.opportuniteId && !l.gagnee && !l.perdue && (
+                        {!lectureSeule && l.opportuniteId && !l.gagnee && !l.perdue && (
                           <BoutonCloser opportuniteId={l.opportuniteId} contact={l.nom} />
                         )}
                         {estAdmin && <SuppressionContact contactId={l.id} nom={l.nom} />}

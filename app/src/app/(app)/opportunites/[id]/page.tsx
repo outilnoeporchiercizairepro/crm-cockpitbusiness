@@ -76,6 +76,10 @@ export default async function FicheOpportunite({
       supabase.from('sources').select('*').eq('is_active', true).order('position'),
     ])
 
+  // Le setter consulte son périmètre et annote : tout le reste lui est
+  // refusé par la base, autant ne pas le lui proposer.
+  const lectureSeule = profil.role === 'setter'
+
   const evenements: Evenement[] = [
     ...(activites.data ?? []).map((a) => ({
       genre: 'activite' as const,
@@ -161,6 +165,7 @@ export default async function FicheOpportunite({
           opportuniteId={opp.id}
           sourceId={opp.source_id}
           sources={(sources.data ?? []) as Source[]}
+          lectureSeule={lectureSeule}
         />
 
         <Timeline
@@ -168,19 +173,22 @@ export default async function FicheOpportunite({
           contactId={contact.id}
           opportuniteId={id}
           nomContact={nomContact(contact)}
+          lectureSeule={lectureSeule}
         />
 
         <div className="space-y-4">
           <Echeancier echeances={echeances.data ?? []} />
 
-          <RelanceWhatsApp
-            opportuniteId={id}
-            contactId={contact.id}
-            telephone={contact.phone}
-            cleIaPresente={!!process.env.OPENAI_API_KEY}
-          />
+          {!lectureSeule && (
+            <RelanceWhatsApp
+              opportuniteId={id}
+              contactId={contact.id}
+              telephone={contact.phone}
+              cleIaPresente={!!process.env.OPENAI_API_KEY}
+            />
+          )}
 
-          <BlocAction
+          {!lectureSeule && <BlocAction
             opportunite={{
               id,
               stage_id: opp.stage_id,
@@ -202,7 +210,7 @@ export default async function FicheOpportunite({
             profils={profils.data ?? []}
             taches={taches.data ?? []}
             moi={moi.id}
-          />
+          />}
 
           {profil.role === 'admin' && (
             <Carte className="p-4">

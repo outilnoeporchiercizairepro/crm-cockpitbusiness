@@ -844,12 +844,21 @@ create policy admin_write on profile_sources
 --      modification si on en est propriétaire, ou si le contact est au pool.
 create policy insert_own on contacts
   for insert to authenticated
-  with check (est_actif() and (created_by = auth.uid() or is_admin()) and source_autorisee(source_id));
+  with check (est_actif() and (created_by = auth.uid() or is_admin())
+              and source_autorisee(source_id)
+              and (is_admin() or current_role_name() is distinct from 'setter'));
 
+-- Le setter obtient la ligne (son périmètre) mais pas les colonnes : c'est le
+-- trigger t_setter_limite_notes qui le cantonne à `notes`. La RLS filtre des
+-- lignes, jamais des colonnes.
 create policy update_owned_or_pool on contacts
   for update to authenticated
-  using (est_actif() and (is_admin() or owner_id = auth.uid() or owner_id is null) and source_autorisee(source_id))
-  with check (est_actif() and (is_admin() or owner_id = auth.uid() or owner_id is null) and source_autorisee(source_id));
+  using (est_actif() and source_autorisee(source_id)
+         and (is_admin() or owner_id = auth.uid() or owner_id is null
+              or current_role_name() = 'setter'))
+  with check (est_actif() and source_autorisee(source_id)
+              and (is_admin() or owner_id = auth.uid() or owner_id is null
+                   or current_role_name() = 'setter'));
 
 create policy admin_delete on contacts
   for delete to authenticated

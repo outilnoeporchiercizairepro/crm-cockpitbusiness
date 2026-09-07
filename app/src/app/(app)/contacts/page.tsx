@@ -63,6 +63,7 @@ export default async function Contacts() {
       lignes={lignes}
       sources={sources ?? []}
       estAdmin={profil.role === 'admin'}
+      lectureSeule={profil.role === 'setter'}
     />
   )
 }

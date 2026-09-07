@@ -29,11 +29,14 @@ export function Timeline({
   contactId,
   opportuniteId,
   nomContact,
+  lectureSeule = false,
 }: {
   evenements: Evenement[]
   contactId: string
   opportuniteId: string
   nomContact: string
+  /** Un setter lit l'historique sans pouvoir y écrire. */
+  lectureSeule?: boolean
 }) {
   const router = useRouter()
   const [, demarrer] = useTransition()
@@ -44,9 +47,11 @@ export function Timeline({
     <Carte className="overflow-hidden">
       <div className="flex items-center justify-between border-b border-bordure px-4 py-3">
         <h2 className="text-sm font-medium">Historique</h2>
-        <button onClick={() => setOuvert((v) => !v)} className={styleBoutonDoux}>
-          {ouvert ? 'Fermer' : 'Logger un échange'}
-        </button>
+        {!lectureSeule && (
+          <button onClick={() => setOuvert((v) => !v)} className={styleBoutonDoux}>
+            {ouvert ? 'Fermer' : 'Logger un échange'}
+          </button>
+        )}
       </div>
 
       {ouvert && (
@@ -153,7 +158,7 @@ export function Timeline({
                       {e.hote ? ` · ${e.hote}` : ''}
                     </p>
 
-                    {e.statut === 'planifie' && (
+                    {e.statut === 'planifie' && !lectureSeule && (
                       <div className="mt-2 flex gap-1.5">
                         {(['honore', 'no_show'] as const).map((s) => (
                           <button

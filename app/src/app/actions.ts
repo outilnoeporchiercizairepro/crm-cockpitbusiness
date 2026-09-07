@@ -174,6 +174,39 @@ export async function definirSource(
   return { ok: true }
 }
 
+/**
+ * Notes du contact — le seul champ qu'un setter peut écrire.
+ *
+ * Action dédiée plutôt que de passer par majContact : cette dernière envoie
+ * toutes les colonnes, et le trigger de la base refuserait l'ensemble parce
+ * qu'il ne compare pas les valeurs mais les colonnes touchées.
+ */
+export async function majNotesContact(
+  contactId: string,
+  notes: string,
+): Promise<Resultat> {
+  await exigerIdentite()
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('contacts')
+    .update({ notes: notes.trim() || null })
+    .eq('id', contactId)
+
+  if (error) {
+    if (error.message.includes('que les notes')) {
+      return { ok: false, erreur: 'Ton compte ne peut modifier que les notes.' }
+    }
+    if (error.message.includes('row-level security') || error.message.includes('42501')) {
+      return { ok: false, erreur: "Ce contact n'est pas dans ton périmètre." }
+    }
+    return echec(error, 'Enregistrement impossible.')
+  }
+
+  revalidatePath('/contacts')
+  return { ok: true }
+}
+
 export async function attribuerContact(id: string): Promise<Resultat> {
   const profil = await exigerIdentite()
   const supabase = await createClient()

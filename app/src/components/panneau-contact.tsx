@@ -1,5 +1,7 @@
 import { Carte } from '@/components/ui'
+import { EtiquetteSource } from '@/components/etiquette-source'
 import { ChoixSource } from '@/components/choix-source'
+import { NotesContact } from '@/components/notes-contact'
 import type { Source } from '@/lib/database.types'
 
 type ContactFiche = {
@@ -16,12 +18,15 @@ export function PanneauContact({
   opportuniteId,
   sourceId,
   sources,
+  lectureSeule,
 }: {
   contact: ContactFiche
   contactId: string
   opportuniteId: string
   sourceId: string | null
   sources: Source[]
+  /** Un setter consulte : seules les notes lui restent ouvertes. */
+  lectureSeule: boolean
 }) {
   return (
     <div className="space-y-4">
@@ -40,12 +45,20 @@ export function PanneauContact({
         <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-texte-faible">
           Source
         </h2>
-        <ChoixSource
-          opportuniteId={opportuniteId}
-          contactId={contactId}
-          sourceId={sourceId}
-          sources={sources}
-        />
+        {lectureSeule ? (
+          <EtiquetteSource
+            label={sources.find((s) => s.id === sourceId)?.label}
+            ton={sources.find((s) => s.id === sourceId)?.color}
+            vide={<span className="text-sm text-texte-faible">Non renseignée</span>}
+          />
+        ) : (
+          <ChoixSource
+            opportuniteId={opportuniteId}
+            contactId={contactId}
+            sourceId={sourceId}
+            sources={sources}
+          />
+        )}
 
         {contact.main_pain && (
           <div className="mt-3 border-t border-bordure pt-3">
@@ -55,14 +68,7 @@ export function PanneauContact({
         )}
       </Carte>
 
-      {contact.notes && (
-        <Carte className="p-4">
-          <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-texte-faible">
-            Notes
-          </h2>
-          <p className="whitespace-pre-wrap text-sm text-texte-doux">{contact.notes}</p>
-        </Carte>
-      )}
+      <NotesContact contactId={contactId} notes={contact.notes} />
     </div>
   )
 }

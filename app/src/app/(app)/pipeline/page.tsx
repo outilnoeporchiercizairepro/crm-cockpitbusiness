@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { exigerIdentite } from '@/lib/session'
+import { exigerIdentite, profilCourant } from '@/lib/session'
 import { Kanban } from '@/components/kanban'
 import { EnTetePage } from '@/components/ui'
 import type { PipelineStage, TonSource } from '@/lib/database.types'
@@ -29,6 +29,7 @@ export default async function Pipeline({
 }) {
   const { qui, source } = await searchParams
   const moi = await exigerIdentite()
+  const profil = await profilCourant()
   const supabase = await createClient()
 
   const [etapesRes, oppsRes, profilsRes, sourcesRes, motifsRes] = await Promise.all([
@@ -84,6 +85,7 @@ export default async function Pipeline({
         sources={sourcesRes.data ?? []}
         motifs={motifsRes.data ?? []}
         moi={moi.id}
+        lectureSeule={profil.role === 'setter'}
         filtreQui={qui ?? ''}
         filtreSource={source ?? ''}
       />

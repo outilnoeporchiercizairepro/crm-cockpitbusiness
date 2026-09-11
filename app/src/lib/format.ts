@@ -190,6 +190,12 @@ export const LIBELLE_PLAN: Record<string, string> = {
   '2x': '2 fois',
   '3x': '3 fois',
   '4x': '4 fois',
+  '5x': '5 fois',
+  '6x': '6 fois',
+  '7x': '7 fois',
+  '8x': '8 fois',
+  '9x': '9 fois',
+  '10x': '10 fois',
   autre: 'Autre',
 }
 

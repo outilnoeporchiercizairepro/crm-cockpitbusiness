@@ -9,7 +9,9 @@ export type ActivityType = 'appel' | 'dm_linkedin' | 'whatsapp' | 'sms' | 'email
 export type ActivityDirection = 'entrant' | 'sortant' | 'interne'
 export type AppointmentKind = 'setting' | 'closing' | 'suivi'
 export type AppointmentStatus = 'planifie' | 'honore' | 'no_show' | 'replanifie' | 'annule'
-export type PaymentPlan = '1x' | '2x' | '3x' | '4x' | 'autre'
+export type PaymentPlan =
+  | '1x' | '2x' | '3x' | '4x' | '5x' | '6x' | '7x' | '8x' | '9x' | '10x'
+  | 'autre'
 export type PaymentProcessor = 'mollie' | 'stripe' | 'virement' | 'especes' | 'autre'
 export type LegalEntity = 'auto' | 'sasu'
 export type TaskStatus = 'a_faire' | 'fait' | 'annule'

@@ -22,7 +22,7 @@ create type activity_type      as enum ('appel', 'dm_linkedin', 'whatsapp', 'sms
 create type activity_direction as enum ('entrant', 'sortant', 'interne');
 create type appointment_kind   as enum ('setting', 'closing', 'suivi');
 create type appointment_status as enum ('planifie', 'honore', 'no_show', 'replanifie', 'annule');
-create type payment_plan       as enum ('1x', '2x', '3x', '4x', 'autre');
+create type payment_plan       as enum ('1x', '2x', '3x', '4x', '5x', '6x', '7x', '8x', '9x', '10x', 'autre');
 create type payment_processor  as enum ('mollie', 'stripe', 'virement', 'especes', 'autre');
 create type legal_entity       as enum ('auto', 'sasu');
 create type task_status        as enum ('a_faire', 'fait', 'annule');

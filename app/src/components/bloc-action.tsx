@@ -8,7 +8,8 @@ import {
 } from '@/app/actions'
 import { Carte, Badge, styleChamp, styleBouton, styleBoutonDoux } from '@/components/ui'
 import { BoutonCloser } from '@/components/bouton-closer'
-import { jourHeure, relatif, enRetard } from '@/lib/format'
+import { jourHeure, relatif, enRetard, LIBELLE_PLAN } from '@/lib/format'
+import { PLANS_ECHELONNES } from '@/lib/echeances'
 import type { PipelineStage, PaymentPlan, PaymentProcessor, LegalEntity, Task } from '@/lib/database.types'
 
 type OppFiche = {
@@ -181,10 +182,9 @@ export function BlocAction({
               <label className="mb-1 block text-xs text-texte-doux">Mode de paiement</label>
               <select name="payment_plan" className={styleChamp} defaultValue={opportunite.payment_plan ?? ''}>
                 <option value="">—</option>
-                <option value="1x">One shot</option>
-                <option value="2x">2 fois</option>
-                <option value="3x">3 fois</option>
-                <option value="4x">4 fois</option>
+                {PLANS_ECHELONNES.map((v) => (
+                  <option key={v} value={v}>{LIBELLE_PLAN[v]}</option>
+                ))}
                 <option value="autre">Autre</option>
               </select>
             </div>

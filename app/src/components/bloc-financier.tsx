@@ -1,6 +1,7 @@
 import { Badge, Carte, LienOpportunite, Stat, TableauCompact } from '@/components/ui'
 import { euros, jour, jourIso, mois, moisIso, pct, LIBELLE_PLAN } from '@/lib/format'
 import type { Payment, PaymentPlan, SaleRow } from '@/lib/database.types'
+import { PLANS_ECHELONNES } from '@/lib/echeances'
 
 /**
  * Ce que devient une échéance dans les totaux. Une ligne annulée disparaît du
@@ -48,7 +49,7 @@ function ventiler(lignes: Payment[], aujourdhui: string): Ventilation {
   return v
 }
 
-const PLANS: PaymentPlan[] = ['1x', '2x', '3x', '4x', 'autre']
+const PLANS: PaymentPlan[] = [...PLANS_ECHELONNES, 'autre']
 
 export function BlocFinancier({
   ventes,

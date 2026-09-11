@@ -4,8 +4,8 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { cloturerGagne } from '@/app/actions-closing'
 import { styleChamp, styleBoutonDoux } from '@/components/ui'
-import { NOMBRE_ECHEANCES, repartirEcheances } from '@/lib/echeances'
-import { euros, FUSEAU } from '@/lib/format'
+import { NOMBRE_ECHEANCES, PLANS_ECHELONNES, repartirEcheances } from '@/lib/echeances'
+import { euros, FUSEAU, LIBELLE_PLAN } from '@/lib/format'
 import type { PaymentPlan, LegalEntity } from '@/lib/database.types'
 
 /**
@@ -141,22 +141,22 @@ export function ModaleClosing({
 
           <div>
             <label className="mb-1.5 block text-xs text-texte-doux">Mode de paiement</label>
-            <div className="flex flex-wrap gap-1.5">
-              {([['1x', 'One shot'], ['2x', '2 fois'], ['3x', '3 fois'], ['4x', '4 fois']] as [PaymentPlan, string][]).map(
-                ([v, l]) => (
-                  <button
-                    key={v}
-                    onClick={() => setPlan(v)}
-                    className={`rounded-lg border px-3 py-1.5 text-sm transition ${
-                      plan === v
-                        ? 'border-altitude bg-altitude/10 text-texte'
-                        : 'border-bordure text-texte-doux hover:border-bordure-forte'
-                    }`}
-                  >
-                    {l}
-                  </button>
-                ),
-              )}
+            {/* Grille 5 x 2 : dix boutons sur une ligne déborderaient de la
+                modale, et une liste déroulante cacherait le choix courant. */}
+            <div className="grid grid-cols-5 gap-1.5">
+              {PLANS_ECHELONNES.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setPlan(v)}
+                  className={`rounded-lg border px-2 py-1.5 text-sm transition ${
+                    plan === v
+                      ? 'border-altitude bg-altitude/10 text-texte'
+                      : 'border-bordure text-texte-doux hover:border-bordure-forte'
+                  }`}
+                >
+                  {v === '1x' ? 'One shot' : v}
+                </button>
+              ))}
             </div>
           </div>
 
